@@ -5,10 +5,17 @@ import { palette } from '@/theme/theme';
 // arrows use these. Decorative: the button around each one carries the label.
 const hidden = { accessibilityElementsHidden: true, importantForAccessibility: 'no' } as const;
 
-export function ChevronIcon({ size = 20, direction = 'right' }: { size?: number; direction?: 'left' | 'right' }) {
+const CHEVRON: Record<'left' | 'right' | 'up' | 'down', string> = {
+  right: 'M9 6l6 6-6 6',
+  left: 'M15 6l-6 6 6 6',
+  up: 'M6 15l6-6 6 6',
+  down: 'M6 9l6 6 6-6',
+};
+
+export function ChevronIcon({ size = 20, direction = 'right' }: { size?: number; direction?: 'left' | 'right' | 'up' | 'down' }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={palette.ink} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" {...hidden}>
-      <Path d={direction === 'right' ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
+      <Path d={CHEVRON[direction]} />
     </Svg>
   );
 }

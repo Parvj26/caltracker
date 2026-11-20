@@ -1,5 +1,5 @@
 # Changing the sets while logging ("E2E Log", 3 sets of Barbell Squat): long-press a row and tap Delete set, + Add
-# set, ••• → Delete a set, and the ••• menu's Add a drop set, whose ↓ Drop tag explains itself. Rows have no swipe: a
+# set, ••• → Delete set, and the ••• menu’s Add drop set, whose ↓ Drop tag explains itself. Rows have no swipe: a
 # sideways swipe always changes the page.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
@@ -49,7 +49,7 @@ env:
     visible:
       id: set-0-0-2
     timeout: 5000
-# ••• → Delete a set → the third set: two again.
+# ••• → Delete set → the third set: two again.
 - tapOn:
     id: more-0-0
 - tapOn:
@@ -75,7 +75,7 @@ env:
     visible:
       id: set-0-0-2
     timeout: 5000
-# ••• → Add a drop set: a D row after the last set.
+# ••• → Add drop set: a ↓ Drop row after the last set, the cursor in its reps.
 - tapOn:
     id: more-0-0
 - tapOn:
@@ -85,6 +85,11 @@ env:
       id: tag-0-0-3
       text: '.*What does ↓ Drop mean.*'
     timeout: 5000
+# Its weight starts at 75% of the set above (132 lb → 99 → 95, rounded down to 5 lb); the cursor is in its reps.
+- assertVisible:
+    id: actual-weight-0-0-3
+    text: '95'
+- pressKey: Enter
 - tapOn:
     id: tag-0-0-3
 - extendedWaitUntil:

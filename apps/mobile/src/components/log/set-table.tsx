@@ -20,6 +20,7 @@ import { invalidAnnouncement, readTyped, type CellModel, type RowModel } from '@
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { logMaxFontScale } from '@/theme/typography';
 import { useTheme } from '@/theme/use-theme';
+import { fontFamilyFor } from '@/theme/fonts';
 
 const KEYBOARD: Record<StepField, KeyboardTypeOptions> = {
   weight: 'decimal-pad',
@@ -44,17 +45,28 @@ type Measure = (done: (top: number, height: number) => void) => void;
 
 export class FieldNav {
   private fields = new Map<string, { page: number; order: number; focus: () => void; measure: Measure }>();
+  /** A box asked for before it exists (a drop set just added): focused as soon as it registers. */
+  private pending: string | null = null;
   private scrollers = new Map<number, (dy: number) => void>();
   private current: string | null = null;
   private listeners = new Set<() => void>();
   /** Where the keyboard's top is in the window while it is up (the bar sits just above it), else null. */
   private keyboardTop: number | null = null;
 
-  register(key: string, page: number, order: number, focus: () => void, measure: Measure): () => void {
+  register(key: string, page: number, order: number, focus: () => void, measure: Measure, alias?: string): () => void {
     this.fields.set(key, { page, order, focus, measure });
+    if (alias !== undefined && alias === this.pending) {
+      this.pending = null;
+      // After the menu sheet has gone, or iOS won't raise the keyboard.
+      setTimeout(focus, FOCUS_AFTER_MS);
+    }
     return () => {
       if (this.fields.get(key)?.focus === focus) this.fields.delete(key);
     };
+  }
+  /** Puts the cursor in a set's box once it is on screen ("<setId>:<field>"), e.g. a new drop set's reps. */
+  focusWhenReady(alias: string): void {
+    this.pending = alias;
   }
   /** A page's scroll view, so a box hidden behind the bar can be scrolled into view. */
   registerScroller(page: number, scrollBy: (dy: number) => void): () => void {
@@ -111,6 +123,9 @@ export const FieldNavContext = createContext<FieldNav | null>(null);
 
 /** iOS 26 puts its own Done above a number pad: the bar then only adds ‹ › (one Done, not two). */
 const SYSTEM_DONE = Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26;
+
+/** A new box gets the cursor this long after it appears (the menu sheet closes first). */
+const FOCUS_AFTER_MS = 350;
 
 /** Height of the bar above the number pad. */
 export const KEYBOARD_BAR_HEIGHT = 56;
@@ -214,7 +229,7 @@ export type TableHandlers = {
   onTick: (row: RowModel) => void;
   /** VoiceOver's "Delete set" action: removes the set straight away. */
   onDelete: (row: RowModel) => void;
-  /** A long press on a row: the sheet with "Delete set". Only for a set that may be deleted. */
+  /** The row's ··· or a long press: the set menu (Add drop set, Delete set). Only for a set that has either. */
   onRowMenu: (row: RowModel) => void;
   /** The W / D / F tag: what it means. */
   onTag: (row: RowModel) => void;
@@ -240,7 +255,9 @@ function Cell({
   who,
   units,
   testID,
-  unitBelow,
+  unitMode,
+  faded,
+  fit,
   disabled,
   readOnly,
   nav,
@@ -251,7 +268,12 @@ function Cell({
   who: string;
   units: Units;
   testID: string;
-  unitBelow: boolean;
+  /** 'none': the column heading says it; 'auto': inside the box when it fits, else under it (large text). */
+  unitMode: 'none' | 'auto';
+  /** A round still to come: its suggested number is fainter. */
+  faded: boolean;
+  /** The row's longest number and unit: every box of a row puts its unit inside, or every box under. */
+  fit: { value: string; unit: string };
   disabled: boolean;
   readOnly: boolean;
   /** Its page and place on the page, for ‹ › on the keyboard bar. */
@@ -259,6 +281,8 @@ function Cell({
   onType: (patch: ActualPatch) => void;
 }) {
   const { logText: text, space, radius } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const [boxWidth, setBoxWidth] = useState(0);
   const [draft, setDraft] = useState(cell.value);
   const [focused, setFocused] = useState(false);
   const [invalid, setInvalid] = useState<string | null>(null);
@@ -276,72 +300,96 @@ function Cell({
       nav.order,
       () => input.current?.focus(),
       (done) => input.current?.measureInWindow((_x, y, _w, h) => done(y, h)),
+      `${row.setId}:${cell.field}`,
     );
-  }, [fields, nav?.page, nav?.order, editable, testID]);
+  }, [fields, nav?.page, nav?.order, editable, testID, row.setId, cell.field]);
   /** The greyed suggestion, when it is a number the box can take as its own (not "max"). */
   const suggestion = draft === '' && !row.done && NUMERIC.test(cell.placeholder) ? cell.placeholder : null;
   const label = `${who}${SPOKEN[cell.field]}${cell.field === 'reps' ? '' : ` in ${cell.unit}`}`;
+  const shown = draft || (row.done || readOnly ? '' : cell.placeholder) || '–';
+  // Units inside the box at normal text sizes (approved SS boards), under it once they no longer fit.
+  const inside = unitMode === 'auto' && fontScale <= UNIT_INSIDE_MAX_SCALE && boxWidth >= insideWidth(fit.value.length > shown.length ? fit.value : shown, fit.unit);
+  const below = unitMode === 'auto' && !inside;
+  const boxStyle = [
+    styles.input,
+    { borderRadius: radius.input, paddingHorizontal: space[1] },
+    row.done && styles.inputDone,
+    readOnly && styles.inputReadOnly,
+    focused && styles.inputFocused,
+    invalid !== null && styles.inputInvalid,
+  ];
+  const field = (
+    <TextInput
+      ref={input}
+      testID={testID}
+      value={draft}
+      editable={editable}
+      accessibilityState={{ disabled: disabled || readOnly }}
+      keyboardType={KEYBOARD[cell.field]}
+      returnKeyType="done"
+      selectTextOnFocus
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
+      accessibilityLabel={label}
+      accessibilityHint={invalid ?? (readOnly ? READ_ONLY_HINT : (WORD_HINTS[cell.placeholder.replace(/kg|lb/, 'unit')] ?? undefined))}
+      placeholder={row.done || readOnly ? '' : cell.placeholder || '–'}
+      placeholderTextColor={faded ? palette.borderStrong : palette.inkMuted}
+      onFocus={() => {
+        setFocused(true);
+        fields?.focused(testID);
+        // Tapped or reached with ‹ ›: the suggestion becomes the box's number, selected once it is in, so typing
+        // replaces it. Only on focus (a press that turns into a swipe changes nothing); leaving without typing keeps
+        // it unsaved (onBlur puts the stored value back).
+        if (suggestion !== null) {
+          setDraft(suggestion);
+          requestAnimationFrame(() => input.current?.setSelection(0, suggestion.length));
+        }
+      }}
+      onBlur={() => {
+        setFocused(false);
+        fields?.blurred(testID);
+        setInvalid(null);
+        setDraft(cell.value);
+      }}
+      onChangeText={(t) => {
+        setDraft(t);
+        const read = readTyped(cell.field, t, units, row.done);
+        if (read.kind === 'invalid') {
+          // accessibilityLiveRegion below is Android only: on iOS, VoiceOver is told the reason here, once.
+          const say = invalidAnnouncement(invalid, read.message);
+          if (say) AccessibilityInfo.announceForAccessibility(say);
+          setInvalid(read.message);
+          return;
+        }
+        setInvalid(null);
+        onType(read.patch);
+      }}
+      style={[text('sectionHeading'), inside ? styles.inputInside : boxStyle]}
+    />
+  );
   return (
-    <View style={[styles.cell, { gap: space[1] / 2 }]}>
-      <TextInput
-        ref={input}
-        testID={testID}
-        value={draft}
-        editable={editable}
-        accessibilityState={{ disabled: disabled || readOnly }}
-        keyboardType={KEYBOARD[cell.field]}
-        returnKeyType="done"
-        selectTextOnFocus
-        maxFontSizeMultiplier={MAX_FONT_SCALE}
-        accessibilityLabel={label}
-        accessibilityHint={invalid ?? (readOnly ? READ_ONLY_HINT : (WORD_HINTS[cell.placeholder.replace(/kg|lb/, 'unit')] ?? undefined))}
-        placeholder={row.done || readOnly ? '' : cell.placeholder || '–'}
-        placeholderTextColor={palette.inkMuted}
-        onFocus={() => {
-          setFocused(true);
-          fields?.focused(testID);
-          // Tapped or reached with ‹ ›: the suggestion becomes the box's number, selected once it is in, so typing
-          // replaces it. Only on focus (a press that turns into a swipe changes nothing); leaving without typing keeps
-          // it unsaved (onBlur puts the stored value back).
-          if (suggestion !== null) {
-            setDraft(suggestion);
-            requestAnimationFrame(() => input.current?.setSelection(0, suggestion.length));
-          }
-        }}
-        onBlur={() => {
-          setFocused(false);
-          fields?.blurred(testID);
-          setInvalid(null);
-          setDraft(cell.value);
-        }}
-        onChangeText={(t) => {
-          setDraft(t);
-          const read = readTyped(cell.field, t, units, row.done);
-          if (read.kind === 'invalid') {
-            // accessibilityLiveRegion below is Android only: on iOS, VoiceOver is told the reason here, once.
-            const say = invalidAnnouncement(invalid, read.message);
-            if (say) AccessibilityInfo.announceForAccessibility(say);
-            setInvalid(read.message);
-            return;
-          }
-          setInvalid(null);
-          onType(read.patch);
-        }}
-        style={[
-          text('sectionHeading'),
-          styles.input,
-          { borderRadius: radius.input, paddingHorizontal: space[1] },
-          row.done && styles.inputDone,
-          readOnly && styles.inputReadOnly,
-          focused && styles.inputFocused,
-          invalid !== null && styles.inputInvalid,
-        ]}
-      />
+    <View style={[styles.cell, { gap: space[1] / 2 }]} onLayout={(e) => setBoxWidth(e.nativeEvent.layout.width)}>
+      {inside ? (
+        // The whole box takes the tap (the unit beside the number too); VoiceOver reads the number box itself.
+        <Pressable accessible={false} disabled={!editable} onPress={() => input.current?.focus()} style={[boxStyle, styles.boxRow]}>
+          <View style={{ width: numberWidth(shown) }}>{field}</View>
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            numberOfLines={1}
+            importantForAccessibility="no"
+            accessibilityElementsHidden
+            style={[text('caption'), styles.unitInside]}
+          >
+            {cell.unit}
+          </Text>
+        </Pressable>
+      ) : (
+        field
+      )}
       {invalid !== null ? (
         <Text testID={`invalid-${testID}`} accessibilityLiveRegion="polite" maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.invalidText]}>
           {invalid}
         </Text>
-      ) : unitBelow ? (
+      ) : below ? (
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('caption'), styles.centre, row.done && styles.ink]}>
           {cell.unit}
         </Text>
@@ -350,12 +398,34 @@ function Cell({
   );
 }
 
+/** A superset row's gaps: a little tighter, so "10 reps each" fits inside its box on a phone. */
+const ROW_GAP_TIGHT = 6;
+
+/** Above this text size the unit goes under the box. */
+const UNIT_INSIDE_MAX_SCALE = 1.15;
+
+/** Roughly how wide the number is at 18 pt bold (its box sizes to it, so number and unit sit centred together). */
+function numberWidth(value: string): number {
+  return Math.max(2, value.length) * 11 + 4;
+}
+
+/** Roughly how wide "55 lb each" needs its box: the number, the unit at 12 pt, the gap and a little slack. */
+function insideWidth(value: string, unit: string): number {
+  return numberWidth(value) + unit.length * 6.2 + 8;
+}
+
 type RowProps = {
   row: RowModel;
   /** "<page>-<exercise>": test ids are `<what>-<idKey>-<setIndex>`. */
   idKey: string;
-  /** Superset rows have no column headings, so each box says its unit. */
+  /** Superset rows have no column headings, so each box says its unit (inside it, or under it at large text). */
   unitBelow: boolean;
+  /** A superset row: "B1" (or the ↓ Drop chip) in place of the set number, drops not indented. */
+  rowLabel?: string;
+  /** A round still to come: fainter suggestions. */
+  faded?: boolean;
+  /** The row's own ··· (superset rows): the set menu. */
+  showMore?: boolean;
   /** "A2 Curl, ": the exercise, for screen readers, on a superset where rows of several exercises sit together. */
   exerciseLabel: string | null;
   units: Units;
@@ -386,14 +456,22 @@ function SetRowLineView({
   readOnly = false,
   recent = false,
   showLast = false,
+  rowLabel,
+  faded = false,
+  showMore = false,
   page,
   order = 0,
   handlers,
 }: RowProps) {
   const { logText: text, space, radius } = useTheme();
-  const tagged = row.tagKind !== 'normal';
+  // On a superset row a warm-up keeps its W and a drop its ↓ Drop; any other set shows the exercise's label (B1).
+  const tagged = rowLabel !== undefined ? row.tagKind === 'warmup' || row.tagKind === 'drop' : row.tagKind !== 'normal';
+  const tagText = rowLabel !== undefined && !tagged ? rowLabel : row.tag;
   const id = `${idKey}-${row.setIndex}`;
   const deletable = !disabled && !readOnly && row.deletable;
+  const hasMenu = !disabled && !readOnly && (row.deletable || row.canDrop);
+  const longest = (xs: string[]) => xs.reduce((a, b) => (b.length > a.length ? b : a), '');
+  const fit = { value: longest(row.cells.map((c) => c.value || c.placeholder)), unit: longest(row.cells.map((c) => c.unit)) };
   const locked = disabled || readOnly;
   const setWords = row.name.charAt(0).toLowerCase() + row.name.slice(1);
   const who = `${exerciseLabel ? `${exerciseLabel}, ` : ''}${row.name}, `;
@@ -402,32 +480,45 @@ function SetRowLineView({
   };
   return (
     // Not one element for VoiceOver (accessible false): the boxes and ✓ stay separate.
-    <Pressable accessible={false} onLongPress={deletable ? () => handlers.onRowMenu(row) : undefined}>
+    <Pressable accessible={false} onLongPress={hasMenu ? () => handlers.onRowMenu(row) : undefined}>
       <View
         testID={`set-${id}`}
         accessibilityActions={deletable ? DELETE_ACTIONS : undefined}
         onAccessibilityAction={onAction}
         style={[
           styles.row,
-          { gap: space[2], paddingVertical: space[1], paddingHorizontal: space[2], borderRadius: radius.input },
-          row.indented && { marginLeft: space[4] },
+          { gap: rowLabel !== undefined ? ROW_GAP_TIGHT : space[2], paddingVertical: space[1], paddingHorizontal: space[2], borderRadius: radius.input },
+          row.indented && rowLabel === undefined && { marginLeft: space[4] },
           row.done && styles.rowDone,
           (recent || (row.current && !readOnly)) && styles.rowRecent,
         ]}
       >
         <Pressable
           testID={`tag-${id}`}
-          disabled={!tagged && !deletable}
+          disabled={!tagged && !hasMenu}
           onPress={tagged ? () => handlers.onTag(row) : undefined}
-          onLongPress={deletable ? () => handlers.onRowMenu(row) : undefined}
+          onLongPress={hasMenu ? () => handlers.onRowMenu(row) : undefined}
           accessibilityActions={deletable ? DELETE_ACTIONS : undefined}
           onAccessibilityAction={onAction}
           accessibilityRole={tagged ? 'button' : 'text'}
           accessibilityLabel={tagged ? `${row.name}. What does ${row.tag} mean?` : row.name}
-          style={({ pressed }) => [styles.tag, tagged && [styles.tagChip, { borderRadius: radius.pill }], pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.tag,
+            rowLabel !== undefined && styles.tagLabel,
+            tagged && [styles.tagChip, { borderRadius: radius.pill }],
+            pressed && styles.pressed,
+          ]}
         >
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text(row.tagKind === 'drop' ? 'caption' : 'sectionHeading'), styles.ink, styles.centre]}>
-            {row.tag}
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            style={[
+              text(row.tagKind === 'drop' || rowLabel !== undefined ? 'caption' : 'sectionHeading'),
+              styles.ink,
+              styles.centre,
+              rowLabel !== undefined && styles.labelText,
+            ]}
+          >
+            {tagText}
           </Text>
         </Pressable>
         {showLast ? (
@@ -449,7 +540,9 @@ function SetRowLineView({
             who={who}
             units={units}
             testID={`actual-${cell.field}-${id}`}
-            unitBelow={unitBelow}
+            unitMode={unitBelow ? 'auto' : 'none'}
+            faded={faded}
+            fit={fit}
             disabled={disabled}
             readOnly={readOnly}
             nav={page === undefined ? null : { page, order: order * 10 + ci }}
@@ -478,10 +571,30 @@ function SetRowLineView({
             readOnly ? !row.done && styles.tickReadOnly : disabled && styles.disabled,
           ]}
         >
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('sectionHeading'), row.done ? styles.tickMarkDone : styles.tickMarkOpen]}>
-            ✓
-          </Text>
+          {/* An open tick is a blank circle (approved LT boards). */}
+          {row.done ? (
+            <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('sectionHeading'), styles.tickMarkDone]}>
+              ✓
+            </Text>
+          ) : null}
         </Pressable>
+        {showMore ? (
+          hasMenu ? (
+            <Pressable
+              testID={`set-more-${id}`}
+              onPress={() => handlers.onRowMenu(row)}
+              accessibilityRole="button"
+              accessibilityLabel={`More for ${exerciseLabel ? `${exerciseLabel}, ` : ''}${setWords}`}
+              style={({ pressed }) => [styles.more, pressed && styles.pressed]}
+            >
+              <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={[text('sectionHeading'), styles.ink]}>
+                ···
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={styles.moreSpace} />
+          )
+        ) : null}
       </View>
     </Pressable>
   );
@@ -510,6 +623,10 @@ export const SetRowLine = memo(
     a.row.deletable === b.row.deletable &&
     a.row.last === b.row.last &&
     a.row.current === b.row.current &&
+    a.row.canDrop === b.row.canDrop &&
+    a.rowLabel === b.rowLabel &&
+    a.faded === b.faded &&
+    a.showMore === b.showMore &&
     a.showLast === b.showLast &&
     a.page === b.page &&
     a.order === b.order &&
@@ -550,7 +667,8 @@ export function SetTable({
 }) {
   const { logText: text, space, radius } = useTheme();
   const headings = rows[0]?.cells.map((c) => c.heading) ?? [];
-  const showLast = useShowLastColumn();
+  // No LAST TIME column without a last time (approved LT1 board).
+  const showLast = useShowLastColumn() && rows.some((r) => r.last !== null);
   return (
     <View style={[styles.table, { borderRadius: radius.card, padding: space[2], gap: space[1] }]}>
       <View style={[styles.row, { gap: space[2], paddingHorizontal: space[2] }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -627,7 +745,8 @@ const styles = StyleSheet.create({
     borderColor: palette.borderStrong,
     textAlign: 'center',
   },
-  inputDone: { borderColor: palette.border, backgroundColor: palette.surface },
+  // A ticked set: borderless grey cells (approved LT boards), still editable.
+  inputDone: { borderColor: 'transparent', backgroundColor: palette.border },
   inputFocused: { borderColor: palette.ink, borderWidth: 2.5 },
   // Read only: no box to type in, just the number on the row (dashed, so it doesn't look tappable).
   inputReadOnly: { backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: palette.inkMuted },
@@ -635,6 +754,13 @@ const styles = StyleSheet.create({
   invalidText: { color: palette.magentaDeep, textAlign: 'center' },
   centre: { textAlign: 'center' },
   ink: { color: palette.ink },
+  boxRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  inputInside: { minHeight: tapTarget.min, textAlign: 'right', borderWidth: 0, backgroundColor: 'transparent', paddingHorizontal: 0 },
+  unitInside: { color: palette.ink, fontSize: 12 },
+  tagLabel: { width: 50, minWidth: 0, alignItems: 'flex-start' },
+  labelText: { fontFamily: fontFamilyFor('sans', 800), textAlign: 'left' },
+  more: { width: tapTarget.min, height: tapTarget.min, alignItems: 'center', justifyContent: 'center' },
+  moreSpace: { width: tapTarget.min },
   tick: {
     width: tapTarget.min,
     height: tapTarget.min,
@@ -647,7 +773,6 @@ const styles = StyleSheet.create({
   tickOpen: { backgroundColor: palette.bg, borderColor: palette.borderStrong },
   tickDone: { backgroundColor: palette.ink, borderColor: palette.ink },
   tickReadOnly: { borderStyle: 'dashed', borderColor: palette.inkMuted },
-  tickMarkOpen: { color: palette.border },
   tickMarkDone: { color: white },
   pressed: { opacity: pressedOpacity },
   disabled: { opacity: 0.4 },

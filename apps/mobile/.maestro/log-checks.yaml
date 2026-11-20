@@ -76,10 +76,9 @@ env:
 - assertNotVisible:
     id: sync-pill
 
-# ---- Last time: nothing yet for this client (the column shows a dash; ··· has no Last time) ----
-- assertVisible:
+# ---- Last time: nothing yet for this client (no LAST TIME column; ··· has no Last time) ----
+- assertNotVisible:
     id: last-0-0-1
-    text: 'No last time'
 - tapOn:
     id: more-0-0
 - assertNotVisible:

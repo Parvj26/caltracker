@@ -303,7 +303,7 @@ export default function SummaryScreen() {
       {milestone ? (
         <View testID="summary-milestone" style={[styles.row, styles.celebrate, { borderRadius: radius.card, padding: space[3.5], gap: space[3] }]}>
           <Text style={[text('screenTitle'), styles.ink]}>🏆</Text>
-          <Text style={[text('sectionHeading'), styles.flex]}>{`${milestone}! A milestone worth celebrating.`}</Text>
+          <Text style={[text('sectionHeading'), styles.flex]}>{`${milestone}!`}</Text>
         </View>
       ) : null}
 
@@ -321,7 +321,7 @@ export default function SummaryScreen() {
 
       {slowAward ? (
         <View testID="summary-award-slow" style={[styles.row, styles.slow, { borderRadius: radius.input + 2, padding: space[3], gap: space[2.5] }]}>
-          <Text style={[text('body'), styles.flex]}>Still saving your stickers… If this takes long they’ll show here when it’s ready.</Text>
+          <Text style={[text('body'), styles.flex]}>Saving stickers…</Text>
           <Button variant="secondary" title="Try again" testID="summary-award-retry" onPress={() => setAttempt((n) => n + 1)} />
         </View>
       ) : null}

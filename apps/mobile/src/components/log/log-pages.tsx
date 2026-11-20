@@ -3,16 +3,28 @@
 // screen through the handlers. readOnly (the coach logs the workout): the same pages with the coach's numbers, and
 // no control that edits.
 import { useState, type ReactNode, type Ref } from 'react';
-import { Pressable, StyleSheet, Text, View, type HostInstance } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions, type HostInstance } from 'react-native';
 import type { Units } from '@caltracker/shared';
 import { Button } from '@/components/ui';
 import { borderWidth, tapTarget } from '@caltracker/design-tokens';
 import { logControls } from '@/lib/coach-watch';
 import type { ExerciseDetail } from '@/lib/exercise-detail';
-import type { ExerciseModel, OptionPageModel, RowModel, StraightPageModel, SupersetPageModel } from '@/lib/log-flow-model';
+import {
+  isRoundOpen,
+  toggleRound,
+  type ExerciseModel,
+  type FoldState,
+  type OptionPageModel,
+  type RoundModel,
+  type RowModel,
+  type StraightPageModel,
+  type SupersetPageModel,
+} from '@/lib/log-flow-model';
+import { ChevronIcon } from '@/components/ui/icons';
+import { LockIcon } from '@/components/settings/icons';
 import { palette, pressedOpacity, white } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
-import { ExerciseDemo, ExerciseTools } from './exercise-tools';
+import { ExerciseDemo, ExerciseTools, Tool } from './exercise-tools';
 import { AddSetButton, SetRowLine, SetTable, type TableHandlers } from './set-table';
 import { fontFamilyFor } from '@/theme/fonts';
 import { ExerciseBadges } from '@/components/exercise-badges';
@@ -20,6 +32,8 @@ import { ExerciseBadges } from '@/components/exercise-badges';
 export type PageHandlers = {
   table: (ex: ExerciseModel) => TableHandlers;
   onAddSet: (ex: ExerciseModel) => void;
+  /** "+ Add round" on a superset: tops every exercise up to the longest, then one more set each. */
+  onAddRound: (model: SupersetPageModel) => void;
   onInfo: (ex: ExerciseModel) => void;
   onMessage: (ex: ExerciseModel) => void;
   onSwap: (ex: ExerciseModel) => void;
@@ -75,8 +89,8 @@ function CoachNote({ coachName, note }: { coachName: string | null; note: string
 }
 
 /**
- * The coach's substitute: "Machine taken? Switch to X" before choosing; "Doing the substitute (planned: Y) · Switch"
- * after. Switching stays possible until a set is ticked.
+ * The coach's substitute: "Machine taken? Switch to X" before choosing; "Instead of Y · Switch" after (approved LT1
+ * board). Switching stays possible until a set is ticked.
  */
 function SubstituteStrip({ ex, idKey, readOnly, onPress }: { ex: ExerciseModel; idKey: string; readOnly: boolean; onPress: () => void }) {
   const { logText: text, space, radius } = useTheme();
@@ -87,7 +101,10 @@ function SubstituteStrip({ ex, idKey, readOnly, onPress }: { ex: ExerciseModel; 
   if (sub.doingInsteadOf !== null) {
     return (
       <View testID={`substitute-doing-${idKey}`} style={[styles.doing, box]}>
-        <Text style={[text('body'), styles.ink, styles.flex]}>{`Doing the substitute (planned: ${sub.doingInsteadOf})`}</Text>
+        <Text style={[text('body'), styles.ink, styles.flex]} accessibilityLabel={`Doing the substitute, instead of the planned ${sub.doingInsteadOf}`}>
+          {'Instead of '}
+          <Text style={styles.bold}>{sub.doingInsteadOf}</Text>
+        </Text>
         {sub.locked || !canSwitch ? null : (
           <Pressable
             testID={`substitute-switch-${idKey}`}
@@ -129,7 +146,7 @@ function Notes({ ex, idKey }: { ex: ExerciseModel; idKey: string }) {
   );
 }
 
-/** The 64 pt demo thumbnail, the name and "Rest 1:30 between sets". Tapping the thumbnail opens the exercise sheet. */
+/** The 64 pt demo thumbnail, the name and "Rest 1:30". Tapping the thumbnail opens the exercise sheet. */
 function ExerciseHead({
   ex,
   idKey,
@@ -154,8 +171,8 @@ function ExerciseHead({
           {ex.name}
         </Text>
         {ex.restLine ? (
-          <Text testID={`rest-line-${idKey}`} style={[text('body'), styles.soft]}>
-            {`${ex.restLine} between sets`}
+          <Text testID={`rest-line-${idKey}`} style={[text('body'), styles.soft]} accessibilityLabel={`${ex.restLine} between sets`}>
+            {ex.restLine}
           </Text>
         ) : null}
       </View>
@@ -225,10 +242,21 @@ export function StraightPage({ model, ...common }: Common & { model: StraightPag
 export function OptionPage({ model, ...common }: Common & { model: OptionPageModel }) {
   const { logText: text, space, radius } = useTheme();
   const can = logControls(common.readOnly);
-  const chosen = model.choices.find((c) => c.chosen);
   const switcher = (
     <View style={{ gap: space[2] }}>
-      <Text style={[text('caption'), styles.overline]}>Pick one</Text>
+      <View style={[styles.rowCentre, { gap: space[2] }]}>
+        <Text style={[text('caption'), styles.overline]}>Pick one</Text>
+        {model.locked ? (
+          <View
+            testID={`option-locked-${common.page}`}
+            accessibilityLabel="Locked: the pick can’t change once a set is ticked"
+            style={[styles.rowCentre, styles.lockedChip, { borderRadius: radius.pill, paddingHorizontal: space[2], gap: 4 }]}
+          >
+            <LockIcon />
+            <Text style={[text('caption'), styles.ink, styles.bold]}>Locked</Text>
+          </View>
+        ) : null}
+      </View>
       <View
         accessibilityRole="radiogroup"
         accessibilityLabel="Choose one"
@@ -259,20 +287,21 @@ export function OptionPage({ model, ...common }: Common & { model: OptionPageMod
           );
         })}
       </View>
-      <Text testID={`option-line-${common.page}`} style={[text('caption'), styles.soft]}>
-        {model.locked
-          ? `You’re doing ${chosen?.name ?? 'this one'}. It can’t be switched once a set is ticked.`
-          : 'Only the chosen one’s sets show. Switch any time before you tick a set.'}
-      </Text>
+      {model.locked || !can.tick ? null : (
+        <Text testID={`option-line-${common.page}`} style={[text('caption'), styles.soft]}>
+          Locks after your first set
+        </Text>
+      )}
     </View>
   );
   return <SingleExercise {...common} ex={model.exercise} rows={model.rows} between={switcher} />;
 }
 
 /**
- * A superset (approved Superset board): A1 then A2 back to back, the rest after the round. Each exercise's demo and
- * tools show once at the top; rounds below, the done ones folded into one line (tap to show). Ticking A1 marks A2 as
- * next.
+ * A superset (approved Superset boards SS1–SS5): "Superset B · Back to back, then rest 1:30", the exercises as slim
+ * rows (photo with its B1 tag, Last, Swap, ···), then the rounds. Done rounds fold into one line (tap to open, tap again
+ * to fold); a partly done one says "· 1 left" and stays open; the current round is a card with the set after the last
+ * tick outlined; rounds to come are faded. "+ Add round", then Mark all.
  */
 export function SupersetPage({
   model,
@@ -289,138 +318,174 @@ export function SupersetPage({
 }: Common & { model: SupersetPageModel }) {
   const { logText: text, space, radius } = useTheme();
   const can = logControls(readOnly);
-  const [opened, setOpened] = useState<Set<number>>(() => new Set());
-  const labels = model.exercises.map((e) => e.label ?? e.name);
-  const rest = model.rounds.find((r) => r.restLine)?.restLine ?? null;
+  const [fold, setFold] = useState<FoldState>({});
+  // At large text sizes Swap and ··· go under the name, so a name never breaks mid-word.
+  const stacked = useWindowDimensions().fontScale > STACK_ABOVE_SCALE;
   let order = 0;
+  const rowsOf = (round: RoundModel, faded: boolean) =>
+    round.entries.map((entry) => {
+      const ex = model.exercises[entry.exerciseIndex];
+      const idKey = keyOf(page, ex);
+      return entry.rows.map((row) => (
+        <SetRowLine
+          key={row.setId}
+          row={row}
+          idKey={idKey}
+          unitBelow
+          rowLabel={ex.label ?? ''}
+          faded={faded}
+          showMore={can.more}
+          exerciseLabel={`${ex.label ?? ''} ${ex.name}`.trim()}
+          units={units}
+          readOnly={readOnly}
+          recent={row.setId === recentSetId}
+          page={page}
+          order={order++}
+          handlers={handlers.table(ex)}
+        />
+      ));
+    });
+  const rest = (round: RoundModel) =>
+    round.restLine ? (
+      <Text testID={`round-rest-${page}-${round.round}`} style={[text('caption'), styles.soft]}>
+        {round.restLine}
+      </Text>
+    ) : null;
   return (
     <View style={{ gap: space[3] }}>
       <CoachNote coachName={coachName} note={coachNote} />
-      <Text ref={headingRef} testID={`superset-heading-${page}`} style={text('screenTitle')} accessibilityRole="header">
-        {model.heading}
-      </Text>
-      <Text style={[text('body'), styles.soft]}>
-        {`Do ${labels.join(' then ')} back to back.${rest ? ` ${rest}.` : ''}`}
-      </Text>
-      {model.exercises.map((ex) => {
-        const idKey = keyOf(page, ex);
-        return (
-          <View key={ex.logExerciseId} style={[styles.exerciseCard, { borderRadius: radius.card, padding: space[3], gap: space[2] }]}>
-            <View style={[styles.rowCentre, { gap: space[2.5] }]}>
-              <View style={[styles.badge, { borderRadius: radius.input - 2 }]}>
-                <Text style={[text('sectionHeading'), styles.onInk]} maxFontSizeMultiplier={BADGE_MAX_SCALE}>
-                  {ex.label}
-                </Text>
-              </View>
-              {/* Name, then last time under it (side by side they squeeze each other at large text). */}
-              <View style={styles.flex}>
-                <Text testID={`exercise-name-${idKey}`} style={text('sectionHeading')}>
-                  {ex.name}
-                </Text>
-                <Text style={[text('caption'), styles.soft]}>{ex.lastLine}</Text>
-              </View>
-            </View>
-            <View style={[styles.rowCentre, { gap: space[3] }]}>
-              <ExerciseDemo name={ex.name} detail={details[ex.exerciseId]} testID={`demo-${idKey}`} onPress={() => handlers.onInfo(ex)} />
-              <View style={styles.flex}>
-                <ExerciseTools
-                  idKey={idKey}
-                  name={ex.name}
-                  coachName={coachName}
-                  hasSubstitute={ex.substitute !== null && !ex.substitute.locked}
-                  onMessage={null}
-                  onSwap={can.swap ? () => handlers.onSwap(ex) : null}
-                  onMore={can.more ? () => handlers.onMore(ex) : null}
-                />
-              </View>
-            </View>
-            <ExerciseBadges badges={ex.badges} help={ex.badgeHelp} testID={`badges-${idKey}`} logging />
-            <Notes ex={ex} idKey={idKey} />
-            <SubstituteStrip ex={ex} idKey={idKey} readOnly={readOnly} onPress={() => handlers.onSubstitute(ex)} />
-          </View>
-        );
-      })}
-      {model.rounds.map((round) => {
-        const current = round.round === model.currentRound;
-        const folded = round.done && !current && !opened.has(round.round);
-        if (folded) {
+      <View style={[styles.titleRow, { columnGap: space[3] }]}>
+        <Text ref={headingRef} testID={`superset-heading-${page}`} style={text('screenTitle')} accessibilityRole="header">
+          {model.heading}
+        </Text>
+        <Text testID={`superset-intro-${page}`} style={[text('body'), styles.soft]}>
+          {model.intro}
+        </Text>
+      </View>
+      <View>
+        {model.exercises.map((ex, i) => {
+          const idKey = keyOf(page, ex);
+          const help = model.helpAfter[ex.exerciseIndex];
           return (
-            <Pressable
-              key={round.round}
-              testID={`round-${page}-${round.round}`}
-              onPress={() => setOpened((o) => new Set(o).add(round.round))}
-              accessibilityRole="button"
-              accessibilityLabel={`${round.heading}. Show its sets.`}
-              style={({ pressed }) => [styles.folded, { borderRadius: radius.input, paddingHorizontal: space[3] }, pressed && { opacity: pressedOpacity }]}
-            >
-              <Text testID={`round-heading-${page}-${round.round}`} style={[text('sectionHeading'), styles.flex]}>
-                {round.heading}
-              </Text>
-              <Text style={[text('caption'), styles.soft]}>Show</Text>
-            </Pressable>
-          );
-        }
-        return (
-          <View key={round.round} testID={`round-${page}-${round.round}`} style={{ gap: space[2] }}>
-            <Text
-              testID={`round-heading-${page}-${round.round}`}
-              style={text('sectionHeading')}
-              accessibilityRole="header"
-              accessibilityLabel={`${round.heading}${current && !round.done ? ', current round' : ''}`}
-            >
-              {round.heading}
-            </Text>
-            {round.entries.map((entry) => {
-              const ex = model.exercises[entry.exerciseIndex];
-              const idKey = keyOf(page, ex);
-              return entry.rows.map((row) => (
-                <View key={row.setId} style={[styles.rowCentre, { gap: space[2] }]}>
-                  <Text style={[text('caption'), styles.roundLabel]}>{ex.label}</Text>
-                  <View style={styles.flex}>
-                    <SetRowLine
-                      row={row}
-                      idKey={idKey}
-                      unitBelow
-                      exerciseLabel={`${ex.label ?? ''} ${ex.name}`.trim()}
-                      units={units}
-                      readOnly={readOnly}
-                      recent={row.setId === recentSetId}
-                      page={page}
-                      order={order++}
-                      handlers={handlers.table(ex)}
-                    />
+            <View key={ex.logExerciseId} style={[i > 0 && styles.divider, { paddingVertical: space[2], gap: space[1] }]}>
+              <View testID={`exercise-row-${idKey}`} style={[styles.slimRow, stacked && styles.slimStacked, { gap: space[2] }]}>
+                <View style={[styles.rowCentre, stacked ? styles.slimFull : styles.slimMain, { gap: space[3] }]}>
+                  <ExerciseDemo
+                    name={ex.name}
+                    detail={details[ex.exerciseId]}
+                    testID={`demo-${idKey}`}
+                    tag={ex.label}
+                    size={SLIM_PHOTO}
+                    onPress={() => handlers.onInfo(ex)}
+                  />
+                  <View style={[styles.flex, { gap: 2 }]}>
+                    <Text testID={`exercise-name-${idKey}`} style={[text('sectionHeading'), styles.slimName]}>
+                      {ex.name}
+                    </Text>
+                    {ex.lastLine || ex.badges.length > 0 ? (
+                      <View style={[styles.rowCentre, styles.wrap, { gap: space[2] }]}>
+                        {ex.lastLine ? (
+                          <Text testID={`last-line-${idKey}`} style={[text('caption'), styles.soft]}>
+                            {ex.lastLine}
+                          </Text>
+                        ) : null}
+                        {/* The chip only: its one-line explanation shows once on the page, below. */}
+                        <ExerciseBadges badges={ex.badges} help={null} testID={`badges-${idKey}`} />
+                      </View>
+                    ) : null}
                   </View>
                 </View>
-              ));
-            })}
-            {round.restLine ? (
-              <Text testID={`round-rest-${page}-${round.round}`} style={[text('caption'), styles.soft]}>
-                {round.restLine}
+                {can.swap || can.more ? (
+                  <View style={[styles.rowCentre, { gap: space[2] }]}>
+                    {can.swap ? (
+                      <Tool
+                        title="Swap"
+                        label={ex.substitute !== null && !ex.substitute.locked ? `Substitute available for ${ex.name}` : `Swap ${ex.name}`}
+                        testID={`swap-${idKey}`}
+                        dotted={ex.substitute !== null && !ex.substitute.locked}
+                        onPress={() => handlers.onSwap(ex)}
+                      />
+                    ) : null}
+                    {can.more ? <Tool title="···" label={`More for ${ex.name}`} testID={`more-${idKey}`} onPress={() => handlers.onMore(ex)} /> : null}
+                  </View>
+                ) : null}
+              </View>
+              {help ? (
+                <Text testID={`badges-help-${page}`} style={[text('caption'), styles.soft]}>
+                  {help}
+                </Text>
+              ) : null}
+              <Notes ex={ex} idKey={idKey} />
+              <SubstituteStrip ex={ex} idKey={idKey} readOnly={readOnly} onPress={() => handlers.onSubstitute(ex)} />
+            </View>
+          );
+        })}
+      </View>
+      {model.rounds.map((round) => {
+        if (round.kind === 'current' || round.kind === 'future') {
+          const current = round.kind === 'current';
+          return (
+            <View
+              key={round.round}
+              testID={`round-${page}-${round.round}`}
+              style={[current && [styles.card, { borderRadius: radius.card, padding: 2, paddingTop: space[1] }], { gap: space[1] }]}
+            >
+              <Text
+                testID={`round-heading-${page}-${round.round}`}
+                style={[text('sectionHeading'), { paddingHorizontal: space[2], paddingTop: space[1] }, !current && styles.soft]}
+                accessibilityRole="header"
+                accessibilityLabel={`${round.heading}${current ? ', current round' : ''}`}
+              >
+                {round.heading}
               </Text>
+              {rowsOf(round, !current)}
+              {rest(round)}
+            </View>
+          );
+        }
+        const open = isRoundOpen(fold, round);
+        const done = round.kind === 'done';
+        return (
+          <View key={round.round} style={[styles.foldBox, { borderRadius: radius.card }]}>
+            <Pressable
+              testID={`round-${page}-${round.round}`}
+              onPress={() => setFold((f) => toggleRound(f, round))}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: open }}
+              accessibilityLabel={`${round.title}, ${done ? `done: ${round.summary.replace(/\+↓/g, 'drop')}` : round.summary}. ${open ? 'Hide' : 'Show'} its sets.`}
+              style={({ pressed }) => [styles.foldLine, { paddingHorizontal: space[3], gap: space[2.5] }, pressed && { opacity: pressedOpacity }]}
+            >
+              <View style={[styles.dot, done ? styles.dotDone : styles.dotOpen]}>{done ? <Text style={styles.dotMark}>✓</Text> : null}</View>
+              <Text testID={`round-heading-${page}-${round.round}`} style={text('sectionHeading')}>
+                {round.title}
+              </Text>
+              <Text testID={`round-summary-${page}-${round.round}`} numberOfLines={1} ellipsizeMode="tail" style={[text('caption'), styles.soft, styles.flex]}>
+                {done ? round.summary : `· ${round.summary}`}
+              </Text>
+              <ChevronIcon direction={open ? 'up' : 'down'} size={18} />
+            </Pressable>
+            {open ? (
+              <View style={[styles.foldBody, { borderRadius: radius.card, padding: 2, gap: space[1] }]}>
+                {rowsOf(round, false)}
+                {rest(round)}
+              </View>
             ) : null}
           </View>
         );
       })}
-      {can.addSet ? (
-        <View style={{ gap: space[1] }}>
-          {model.exercises.map((ex) => (
-            <AddSetButton
-              key={ex.logExerciseId}
-              testID={`add-set-${keyOf(page, ex)}`}
-              title={`+ Add set to ${ex.label ?? ex.name}`}
-              onPress={() => handlers.onAddSet(ex)}
-            />
-          ))}
-        </View>
-      ) : null}
-      <MarkAll page={page} title="Mark all rounds" onPress={can.markAll ? onMarkAll : null} />
+      {can.addSet ? <AddSetButton testID={`add-round-${page}`} title="+ Add round" onPress={() => handlers.onAddRound(model)} /> : null}
+      <MarkAll page={page} title="Mark all" onPress={can.markAll ? onMarkAll : null} />
     </View>
   );
 }
 
-const BADGE = 34;
-/** The A1 badge is a fixed square: its letters stop growing here. */
-const BADGE_MAX_SCALE = 1.2;
+/** Above this text size a superset's exercise row puts Swap and ··· on a line of their own. */
+const STACK_ABOVE_SCALE = 1.3;
+
+/** The photo on a superset's exercise row. */
+const SLIM_PHOTO = 48;
+
+const DOT = 26;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -441,8 +506,21 @@ const styles = StyleSheet.create({
   segmentOn: { borderWidth: borderWidth.card, borderColor: palette.ink, backgroundColor: palette.bg },
   segmentOff: { opacity: 0.4 },
   segmentText: { color: palette.ink, textAlign: 'center', fontSize: 15 },
-  exerciseCard: { borderWidth: borderWidth.secondaryButton, borderColor: palette.border },
-  badge: { width: BADGE, height: BADGE, backgroundColor: palette.ink, alignItems: 'center', justifyContent: 'center' },
-  folded: { flexDirection: 'row', alignItems: 'center', minHeight: tapTarget.min, backgroundColor: palette.surface },
-  roundLabel: { width: 26, color: palette.ink, fontFamily: fontFamilyFor('sans', 800) },
+  wrap: { flexWrap: 'wrap' },
+  titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between' },
+  slimRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' },
+  slimName: { fontSize: 16 },
+  slimStacked: { flexDirection: 'column', alignItems: 'flex-start' },
+  slimFull: { alignSelf: 'stretch' },
+  slimMain: { flexGrow: 1, flexShrink: 1, flexBasis: 200 },
+  divider: { borderTopWidth: 1, borderTopColor: palette.border },
+  card: { borderWidth: borderWidth.secondaryButton, borderColor: palette.border },
+  lockedChip: { backgroundColor: palette.surface, minHeight: 26 },
+  foldBox: { backgroundColor: palette.surface, overflow: 'hidden' },
+  foldLine: { flexDirection: 'row', alignItems: 'center', minHeight: tapTarget.logging },
+  foldBody: { backgroundColor: palette.bg, margin: 2, marginTop: 0 },
+  dot: { width: DOT, height: DOT, borderRadius: DOT / 2, alignItems: 'center', justifyContent: 'center' },
+  dotDone: { backgroundColor: palette.ink },
+  dotOpen: { borderWidth: borderWidth.card, borderColor: palette.borderStrong },
+  dotMark: { color: white, fontFamily: fontFamilyFor('sans', 800), fontSize: 14 },
 });

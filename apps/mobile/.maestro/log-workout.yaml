@@ -35,10 +35,10 @@ env:
     timeout: 10000
 - assertVisible:
     id: rest-line-0-0
-    text: 'Rest 1:30 between sets'
+    text: 'Rest 1:30.*'
 - assertVisible:
     id: pages-sections
-    text: 'Exercise 1 of 1 · All exercises ▾'
+    text: 'Exercise 1 of 1 ▾'
 - assertVisible:
     id: swap-0-0
 # No Finish (or Next) before a set is ticked.
@@ -89,7 +89,7 @@ env:
     timeout: 10000
 - assertVisible:
     id: finish-count
-    text: '3 of 3 sets done.'
+    text: '3 of 3 done'
 - tapOn:
     id: feel-Good
 - tapOn:

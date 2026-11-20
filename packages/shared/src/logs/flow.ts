@@ -117,6 +117,30 @@ export function currentStep(block: LogBlockDoc, preferExerciseIndex?: number): S
   return open[0] ?? null;
 }
 
+/**
+ * Where the client is in a block (the logger's outline and its "Round 3 of 4" header): the first unticked step AFTER
+ * the most recently ticked one, wrapping round to the start; the first unticked step before any tick. So skipping
+ * ahead (ticking round 3 while round 2 still has an open set) moves the header on with them, and going back to tick
+ * the leftover doesn't pull it back. A tie in tick time (Mark all) goes to the later step. Null when all is ticked.
+ */
+export function cursorStep(block: LogBlockDoc): Step | null {
+  const steps = blockSteps(block);
+  let lastAt = -1;
+  let lastMs = -Infinity;
+  steps.forEach((s, i) => {
+    const done = setOf(block, s).completedAt;
+    if (done === null) return;
+    const ms = Date.parse(done);
+    if (ms >= lastMs) {
+      lastMs = ms;
+      lastAt = i;
+    }
+  });
+  if (lastAt < 0) return steps.find((s) => isOpen(block, s)) ?? null;
+  const order = [...steps.slice(lastAt + 1), ...steps.slice(0, lastAt)];
+  return order.find((s) => isOpen(block, s)) ?? null;
+}
+
 export function isBlockDone(block: LogBlockDoc): boolean {
   return !needsPick(block) && liveExercises(block).every(({ exercise }) => exercise.sets.every((s) => s.completedAt !== null));
 }

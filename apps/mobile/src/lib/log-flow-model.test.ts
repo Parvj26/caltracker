@@ -53,6 +53,14 @@ import {
   substituteOf,
   supersetRounds,
   typedPatch,
+  addDropSet,
+  addRound,
+  exerciseMenu,
+  isRoundOpen,
+  roundSummary,
+  setMenu,
+  toggleRound,
+  type SupersetPageModel,
 } from './log-flow-model';
 
 let n = 0;
@@ -378,7 +386,10 @@ describe('pages', () => {
     // The next set to do is marked: A1's first set.
     expect(m.kind === 'superset' && m.rounds[0].entries.map((e) => e.rows[0].current)).toEqual([true, false]);
     expect(m.kind === 'superset' && m.exercises.map((e) => e.label)).toEqual(['A1', 'A2']);
-    expect(m.kind === 'superset' && m.rounds[0].restLine).toBe('Rest 1:00 after the round');
+    // One rest for every round: said once, in the intro, not under each round.
+    expect(m.kind === 'superset' && m.intro).toBe('Back to back, then rest 1:00');
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.restLine)).toEqual([null, null, null, null]);
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.kind)).toEqual(['current', 'future', 'future', 'future']);
     log = completeSet(log, block.exercises[0].sets[0].id, NOW);
     // Ticking A1 moves the mark to A2.
     m = buildPage(log, page, 'lb', {});
@@ -388,8 +399,10 @@ describe('pages', () => {
     // The title stays "Superset A"; round 1 is ticked off under it and round 2 is the current one.
     expect(m.kind === 'superset' && m.heading).toBe('Superset A');
     expect(m.kind === 'superset' && m.currentRound).toBe(2);
-    expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4 ✓', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.heading)).toEqual(['Round 1 of 4', 'Round 2 of 4', 'Round 3 of 4', 'Round 4 of 4']);
+    expect(m.kind === 'superset' && m.rounds.map((r) => r.kind)).toEqual(['done', 'current', 'future', 'future']);
     expect(m.kind === 'superset' && m.rounds[0].done).toBe(true);
+    expect(m.kind === 'superset' && m.rounds[0].title).toBe('Round 1');
   });
 
   it('a straight page has the rest as text and last time for the history button', () => {
@@ -460,18 +473,19 @@ describe('finish and summary', () => {
     expect(finishModel(log)).toEqual({
       done: 1 + 7 + 2 + 2,
       total: 14,
-      headline: '12 of 14 sets done.',
-      unticked: "2 sets of Cable Tricep Pushdown aren’t ticked; they’ll be saved as not done.",
+      headline: '12 of 14 done',
+      unticked: '2 unticked won’t count',
       noneDone: false,
     });
   });
 
   it('counts a pick-one group not picked yet as its first option, then only the picked option', () => {
     let log = tickAll(tickAll(tickAll(mockLog(), 0), 1), 2);
-    expect(finishModel(log)).toMatchObject({ total: 1 + 7 + 4 + 2, unticked: "2 sets aren’t ticked; they’ll be saved as not done." });
+    expect(finishModel(log)).toMatchObject({ total: 1 + 7 + 4 + 2, unticked: '2 unticked won’t count' });
     const block = log.blocks[3];
     log = pickChoice(log, block.id, block.exercises[2].id, NOW);
-    expect(finishModel(log).unticked).toBe("2 sets of Overhead Throw aren’t ticked; they’ll be saved as not done.");
+    expect(finishModel(log).unticked).toBe('2 unticked won’t count');
+    expect(finishModel(tickAll(log, 3))).toMatchObject({ headline: '14 of 14 done', unticked: null });
   });
 
   it('lists the changes from the plan: swaps and the picked finisher', () => {
@@ -820,10 +834,10 @@ describe('the redesigned logger (approved Logger board)', () => {
   it('the header says the section, the exercise number, and the superset round', () => {
     let log = mockLog();
     const s = buildSections(log);
-    expect(headerLines(log, s, { section: 0, page: 0 })).toEqual({ title: 'Parv - Upper/Core · Warm-Up', subtitle: 'Exercise 1 of 4 · All exercises ▾' });
+    expect(headerLines(log, s, { section: 0, page: 0 })).toEqual({ title: 'Parv - Upper/Core · Warm-Up', subtitle: 'Exercise 1 of 4 ▾' });
     expect(headerLines(log, s, { section: 1, page: 0 }).subtitle).toBe('Superset A · Round 1 of 4 ▾');
     log = tickAll(log, 1);
-    expect(headerLines(log, buildSections(log), { section: 1, page: 1 }).subtitle).toBe('Exercise 3 of 4 · All exercises ▾');
+    expect(headerLines(log, buildSections(log), { section: 1, page: 1 }).subtitle).toBe('Exercise 3 of 4 ▾');
     expect(headerLines(log, s, { section: 2, page: 0 }).subtitle).toBe('Pick one · 4 of 4 ▾');
   });
 
@@ -865,7 +879,8 @@ describe('the redesigned logger (approved Logger board)', () => {
     ]);
     expect(rows.map((r) => r.last)).toEqual(['20 × 10', '57.5 × 8', null, null]);
     expect(elapsedLabel(NOW, Date.parse(NOW) + 12 * 60_000 + 5000)).toBe('12 min in');
-    expect(elapsedLabel(NOW, Date.parse(NOW) + 20_000)).toBe('Just started');
+    // Nothing under a minute.
+    expect(elapsedLabel(NOW, Date.parse(NOW) + 20_000)).toBe('');
     expect(elapsedLabel(NOW, Date.parse(NOW) + 65 * 60_000)).toBe('1 h 5 min in');
   });
 
@@ -878,5 +893,169 @@ describe('the redesigned logger (approved Logger board)', () => {
     });
     const log = startLogFromWorkout(doc, uuid, NOW);
     expect(setRows(log.blocks[0].exercises[0], 'kg', [])[0].cells.map((c) => c.placeholder)).toEqual(['+ kg', '8']);
+  });
+});
+
+describe('the superset page (approved SS1–SS5 boards)', () => {
+  const T = (m: number) => `2026-11-06T10:${String(m).padStart(2, '0')}:00.000Z`;
+  const tickAt = (log: WorkoutLogDoc, setId: string, lb: number, reps: number, minute: number) =>
+    completeSetWith(log, setId, { weightKg: lb * LB, reps, durationS: null, distanceM: null }, T(minute));
+  const superset = (log: WorkoutLogDoc): SupersetPageModel => {
+    const m = buildPage(log, buildSections(log)[1].pages[0], 'lb', {});
+    if (m.kind !== 'superset') throw new Error('superset');
+    return m;
+  };
+  const a = (log: WorkoutLogDoc, i: number) => log.blocks[1].exercises[0].sets[i].id;
+  const b = (log: WorkoutLogDoc, i: number) => log.blocks[1].exercises[1].sets[i].id;
+
+  it('the header and the outline follow the set after the last tick, not the first open one', () => {
+    let log = mockLog();
+    log = tickAt(log, a(log, 0), 45, 12, 1);
+    log = tickAt(log, b(log, 0), 15, 12, 2);
+    log = tickAt(log, a(log, 1), 55, 10, 3);
+    // B2 of round 2 skipped; A1 of round 3 ticked.
+    log = tickAt(log, a(log, 2), 60, 6, 4);
+    const m = superset(log);
+    expect(m.currentRound).toBe(3);
+    expect(headerLines(log, buildSections(log), { section: 1, page: 0 }).subtitle).toBe('Superset A · Round 3 of 4 ▾');
+    expect(m.rounds.map((r) => r.kind)).toEqual(['done', 'partial', 'current', 'future']);
+    expect(m.rounds[1].summary).toBe('1 left');
+    // The outline is on B2 of round 3.
+    expect(m.rounds[2].entries.map((e) => e.rows[0].current)).toEqual([false, true]);
+    // Going back to tick the leftover moves the cursor on from there (round 3's B2), not back to round 2.
+    log = tickAt(log, b(log, 1), 15, 12, 5);
+    expect(superset(log).currentRound).toBe(3);
+    expect(superset(log).rounds.map((r) => r.kind)).toEqual(['done', 'done', 'current', 'future']);
+  });
+
+  it('a round folds and opens by tap; a partly done round starts open, the current one always is', () => {
+    const done = { round: 1, kind: 'done' as const };
+    const partial = { round: 2, kind: 'partial' as const };
+    const current = { round: 3, kind: 'current' as const };
+    let fold = {};
+    expect(isRoundOpen(fold, done)).toBe(false);
+    expect(isRoundOpen(fold, partial)).toBe(true);
+    expect(isRoundOpen(fold, current)).toBe(true);
+    fold = toggleRound(fold, done);
+    expect(isRoundOpen(fold, done)).toBe(true);
+    fold = toggleRound(fold, done);
+    expect(isRoundOpen(fold, done)).toBe(false);
+    fold = toggleRound(fold, partial);
+    expect(isRoundOpen(fold, partial)).toBe(false);
+    expect(isRoundOpen(toggleRound(fold, current), current)).toBe(true);
+  });
+
+  it('a folded round sums up each set, a drop as "+↓"', () => {
+    let log = mockLog();
+    log = tickAt(log, a(log, 0), 45, 12, 1);
+    log = tickAt(log, b(log, 0), 15, 12, 2);
+    expect(superset(log).rounds[0].summary).toBe('45 × 12 · 15 × 12');
+    // Round 3: A1 60 × 6, then a drop at 45 × 8, then B 20 × 12.
+    log = tickAt(log, a(log, 2), 60, 6, 3);
+    log = addDropSet(log, log.blocks[1].exercises[0].id, a(log, 2), 'drop-1', 'lb', [], T(3));
+    log = tickAt(log, 'drop-1', 45, 8, 4);
+    log = tickAt(log, b(log, 2), 20, 12, 5);
+    const block = log.blocks[1];
+    const round3 = supersetRounds(block)[2];
+    expect(roundSummary(block, round3.entries, 'lb')).toBe('60 × 6 +↓ 45 × 8 · 20 × 12');
+    expect(superset(log).rounds[2]).toMatchObject({ kind: 'done', summary: '60 × 6 +↓ 45 × 8 · 20 × 12' });
+  });
+
+  it('+ Add round tops every exercise up to the longest, then adds one each', () => {
+    let log = mockLog();
+    expect(log.blocks[1].exercises.map((e) => e.sets.length)).toEqual([4, 3]);
+    log = addRound(log, log.blocks[1].id, uuid, NOW);
+    expect(log.blocks[1].exercises.map((e) => e.sets.length)).toEqual([5, 5]);
+    expect(superset(log).totalRounds).toBe(5);
+    expect(supersetRounds(log.blocks[1]).map((r) => r.entries.length)).toEqual([2, 2, 2, 2, 2]);
+  });
+
+  it('the intro says the rest once; rounds that rest differently say it each', () => {
+    const log = mockLog();
+    expect(superset(log).intro).toBe('Back to back, then rest 1:00');
+    const firstSet = log.blocks[1].exercises[1].sets[0].id;
+    const varied: WorkoutLogDoc = {
+      ...log,
+      blocks: log.blocks.map((bl) => ({
+        ...bl,
+        exercises: bl.exercises.map((e) => ({ ...e, sets: e.sets.map((x) => (x.id === firstSet ? { ...x, target: { ...x.target, restSeconds: 90 } } : x)) })),
+      })),
+    };
+    const m = superset(varied);
+    expect(m.intro).toBe('Back to back');
+    expect(m.rounds[0].restLine).toBe('Rest 1:30');
+    expect(m.rounds[1].restLine).toBe('Rest 1:00');
+  });
+
+  it('a drop set starts at 75% of the set above, rounded down to the plate step', () => {
+    let log = mockLog();
+    const bench = log.blocks[1].exercises[0].id;
+    const curl = log.blocks[1].exercises[1].id;
+    const weightLb = (l: WorkoutLogDoc, id: string) => {
+      const kg = l.blocks.flatMap((x) => x.exercises).flatMap((e) => e.sets).find((x) => x.id === id)?.actualWeightKg;
+      return kg == null ? null : Math.round((kg / LB) * 100) / 100;
+    };
+    log = tickAt(log, a(log, 0), 60, 6, 1);
+    log = tickAt(log, b(log, 0), 15, 12, 2);
+    const d1 = addDropSet(log, bench, a(log, 0), 'd1', 'lb', [], NOW);
+    expect(weightLb(d1, 'd1')).toBe(45);
+    // The drop sits right after its set, as a drop.
+    expect(d1.blocks[1].exercises[0].sets.map((x) => x.setType)).toEqual(['normal', 'drop', 'normal', 'normal', 'normal']);
+    expect(weightLb(addDropSet(log, curl, b(log, 0), 'd2', 'lb', [], NOW), 'd2')).toBe(10);
+    // Not done yet: from the planned weight (45 lb → 33.75 → 30).
+    expect(weightLb(addDropSet(log, bench, a(log, 1), 'd3', 'lb', [], NOW), 'd3')).toBe(30);
+    // A second drop goes on from the first (45 → 33.75 → 30).
+    expect(weightLb(addDropSet(d1, bench, 'd1', 'd4', 'lb', [], NOW), 'd4')).toBe(30);
+    // kg: 30 kg → 22.5 kg.
+    const kgBase = mockLog();
+    const kgLog = completeSetWith(kgBase, a(kgBase, 0), { weightKg: 30, reps: 8, durationS: null, distanceM: null }, NOW);
+    const kgBench = kgLog.blocks[1].exercises[0];
+    const withKgDrop = addDropSet(kgLog, kgBench.id, kgBench.sets[0].id, 'd5', 'kg', [], NOW);
+    const drop = withKgDrop.blocks[1].exercises[0].sets[1];
+    expect(drop).toMatchObject({ id: 'd5', setType: 'drop' });
+    expect(drop.actualWeightKg).toBeCloseTo(22.5, 6);
+  });
+
+  it('no drop on a warm-up, and none with weight for a reps-only exercise', () => {
+    const log = mockLog();
+    const push = log.blocks[2].exercises[0];
+    expect(addDropSet(log, push.id, push.sets[0].id, 'x', 'lb', [], NOW)).toBe(log);
+    const arms = log.blocks[0].exercises[0];
+    expect(setRows(arms, 'lb', [])[0].canDrop).toBe(false);
+    expect(setRows(push, 'lb', []).map((r) => r.canDrop)).toEqual([false, true, true, true]);
+  });
+
+  it('the menus: the exercise ··· in the approved order, the set ··· with Add drop set above Delete set', () => {
+    const log = mockLog();
+    const bench = log.blocks[1].exercises[0];
+    expect(exerciseMenu(bench, { coachName: 'Demo', hasLastTime: true, deletable: true }).map((m) => m.title)).toEqual([
+      'Note for Demo',
+      'Last time',
+      'How to do it',
+      'Add set',
+      'Add drop set',
+      'Delete set',
+      'Remove exercise',
+    ]);
+    const arms = log.blocks[0].exercises[0];
+    expect(exerciseMenu(arms, { coachName: null, hasLastTime: false, deletable: false }).map((m) => m.title)).toEqual([
+      'Note for your coach',
+      'How to do it',
+      'Add set',
+      'Remove exercise',
+    ]);
+    const rows = setRows(bench, 'lb', []);
+    expect(setMenu(rows[0]).map((m) => m.title)).toEqual(['Add drop set', 'Delete set']);
+    expect(setMenu(setRows(arms, 'lb', [])[0])).toEqual([]);
+  });
+
+  it('each exercise says last time with its units, and nothing the first time', () => {
+    const log = mockLog();
+    const bench = log.blocks[1].exercises[0];
+    const last: LastResults = {
+      [bench.exerciseId]: { finishedAt: NOW, sets: [{ setType: 'normal', actualReps: 10, actualWeightKg: 55 * LB, actualDistanceM: null, actualDurationS: null }] },
+    };
+    const m = buildPage(log, buildSections(log)[1].pages[0], 'lb', last);
+    expect(m.kind === 'superset' && m.exercises.map((e) => e.lastLine)).toEqual(['Last: 55 lb × 10', null]);
   });
 });

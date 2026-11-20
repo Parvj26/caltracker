@@ -112,9 +112,12 @@ export function FinishSheet({
   onSaveDraft,
   onFinish,
   onDiscard,
+  coachName,
 }: {
   visible: boolean;
   model: FinishModel;
+  /** The coach's first name ("Demo sees this."), or null ("Your coach"). */
+  coachName: string | null;
   initialFeel: Feeling | null;
   initialNote: string;
   busy: boolean;
@@ -146,7 +149,7 @@ export function FinishSheet({
           {/* × keeps going (the feeling and note are kept as a draft), like swipe-down. */}
           <SheetHeader title="Finish workout?" closeTestID="finish-close" onClose={() => onKeepGoing(feel, note)} />
           <Text testID="finish-count" style={text('body')}>
-            {[model.headline, model.unticked].filter(Boolean).join(' ')}
+            {[model.headline, model.unticked].filter(Boolean).join(' · ')}
           </Text>
           {model.noneDone ? (
             <>
@@ -159,7 +162,7 @@ export function FinishSheet({
           ) : (
             <>
               <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="How did it feel?">
-                <Text style={text('sectionHeading')}>How did it feel? Your coach sees this.</Text>
+                <Text style={text('sectionHeading')}>{`How did it feel? ${coachName ?? 'Your coach'} sees this.`}</Text>
                 <View style={[styles.feelings, { gap: space[2] }]}>
                   {FEELINGS.map((f) => {
                     const on = feel === f;
@@ -184,7 +187,7 @@ export function FinishSheet({
                 </View>
               </View>
               <TextField
-                label="Note for your coach (optional)"
+                label={`Note for ${coachName ?? 'your coach'} (optional)`}
                 testID="finish-note"
                 value={note}
                 onChangeText={setNote}
