@@ -1,7 +1,23 @@
 // What the Food tab shows and writes, worked out on the phone: the server's meals with the queued saves and deletes
 // applied on top, the operations a save or delete becomes, and the meal-time picker's steps. No network, no React.
 // The macro maths (totals, targets, hints) lives in @caltracker/shared.
-import { MACRO_KEYS, addDays, localDateOf, mealPhotoPaths, type CoachMeal, type HistoryMeal, type IsoDate, type MacroTargets, type MealMacros, type MealSearchItem } from '@caltracker/shared';
+import {
+  MACRO_KEYS,
+  USUAL_MEAL_MINUTES,
+  addDays,
+  foodDayLabel,
+  hasAnyMacro,
+  localDateOf,
+  mealPhotoPaths,
+  mealTypeForMinutes,
+  type CoachMeal,
+  type HistoryMeal,
+  type IsoDate,
+  type MacroTargets,
+  type MealMacros,
+  type MealSearchItem,
+  type MealType,
+} from '@caltracker/shared';
 import type { FoodOp, LocalMealPhoto, MealRecord, StoredPhoto } from './food-queue';
 
 export type ShownMeal = MealRecord & { pending: 'sending' | 'failed' | null; localPhoto: LocalMealPhoto | null; opId: string | null };
@@ -80,7 +96,7 @@ export function historySince(today: IsoDate): IsoDate {
   return addDays(today, -(HISTORY_DAYS - 1));
 }
 
-/** "Log again in one tap": a new meal now, with the name, numbers and coach link. No photo, no note. */
+/** "Log again in one tap" (and Add a meal's +): a new meal on `today` at `now`, with the name, numbers and coach link. No photo, no note. */
 export function logAgainOp(item: MealSearchItem, ids: OpIds, today: IsoDate, now: Date): FoodOp & { kind: 'save' } {
   return {
     opId: ids.opId,
@@ -92,7 +108,7 @@ export function logAgainOp(item: MealSearchItem, ids: OpIds, today: IsoDate, now
       workspaceId: ids.workspaceId,
       eatenAt: now.toISOString(),
       eatenOn: today,
-      name: item.name,
+      name: item.name.trim() === '' ? null : item.name,
       note: '',
       macros: item.macros,
       photo: null,
@@ -276,4 +292,95 @@ export function savedTime(
     return { day: localDateOf(now), minutes: now.getHours() * 60 + now.getMinutes() };
   }
   return { day: editor.day, minutes: editor.minutes };
+}
+
+// ---- When a meal was eaten (Add a meal's "Lunch · Today, 1:15 PM ▾" line and its picker) ----
+
+/** A day and a clock time (minutes after midnight) on the phone's clock. */
+export type When = { day: IsoDate; minutes: number };
+
+const NIGHT_END = 4 * 60;
+const DAY_MINUTES = 24 * 60;
+
+export function whenNow(now: Date = new Date()): When {
+  return { day: localDateOf(now), minutes: now.getHours() * 60 + now.getMinutes() };
+}
+
+export function whenInstant(when: When): Date {
+  return new Date(mealInstant(when.day, when.minutes));
+}
+
+/**
+ * One tap on a meal chip: that meal's usual time on the picked day. Just after midnight (before 04:00) a chip whose
+ * usual time is still to come today means the evening before: Dinner tapped at 00:30 is yesterday at 7 pm, while a
+ * snack at 00:30 stays on the new day.
+ */
+export function whenForMealType(type: MealType, current: When, now: Date = new Date()): When {
+  const at = whenNow(now);
+  const minutes = USUAL_MEAL_MINUTES[type];
+  if (current.day === at.day && at.minutes < NIGHT_END && minutes > at.minutes) return { day: addDays(at.day, -1), minutes };
+  return { day: current.day, minutes };
+}
+
+/**
+ * The time picker's − and + (15 minutes). Going past midnight moves to the day before or after, but never past the
+ * end of `today` nor before the start of `oldest`.
+ */
+export function stepWhen(when: When, direction: 1 | -1, today: IsoDate, oldest: IsoDate): When {
+  const next = direction === 1 ? Math.floor(when.minutes / STEP) * STEP + STEP : Math.ceil(when.minutes / STEP) * STEP - STEP;
+  if (next < 0) return when.day <= oldest ? { day: oldest, minutes: 0 } : { day: addDays(when.day, -1), minutes: DAY_MINUTES + next };
+  if (next >= DAY_MINUTES) return when.day >= today ? { day: today, minutes: LAST } : { day: addDays(when.day, 1), minutes: next - DAY_MINUTES };
+  return { day: when.day, minutes: next };
+}
+
+/** "Lunch · Today, 1:15 PM" (the type comes from the time). */
+export function whenLabel(when: When, today: IsoDate): string {
+  return `${mealTypeForMinutes(when.minutes)} · ${foodDayLabel(when.day, today)}, ${timeLabel(when.minutes).toUpperCase()}`;
+}
+
+/** The days the picker offers, newest first: today and the six before it. */
+export function pickerDays(today: IsoDate, count = 7): IsoDate[] {
+  return Array.from({ length: count }, (_, i) => addDays(today, -i));
+}
+
+/** The meals "Copy yesterday's lunch" logs again: the day before's meals of the same type, earliest first. */
+export function mealsToCopy(history: ReadonlyArray<HistoryMeal>, when: When): HistoryMeal[] {
+  const type = mealTypeForMinutes(when.minutes);
+  const before = addDays(when.day, -1);
+  return history
+    .filter((m) => m.eatenOn === before && (hasAnyMacro(m.macros) || !!m.name?.trim()) && mealTypeForMinutes(minutesOf(m.eatenAt)) === type)
+    .sort((a, b) => Date.parse(a.eatenAt) - Date.parse(b.eatenAt));
+}
+
+/** "Copy yesterday's lunch" when logging for today, otherwise "Copy lunch from the day before". */
+export function copyLabel(when: When, today: IsoDate): string {
+  const type = mealTypeForMinutes(when.minutes).toLowerCase();
+  return when.day === today ? `Copy yesterday’s ${type}` : `Copy ${type} from the day before`;
+}
+
+/** A past meal as something Add a meal can log again (its name, numbers and coach link). */
+export function copyItem(m: HistoryMeal): MealSearchItem {
+  return {
+    key: `copy:${m.id}`,
+    source: 'own',
+    name: m.name?.trim() ?? '',
+    macros: m.macros,
+    coachMealId: m.coachMealId,
+    count: 1,
+    lastEatenAt: m.eatenAt,
+    lastEatenOn: m.eatenOn,
+  };
+}
+
+/** Route params carrying a When to the meal form. */
+export function whenParams(when: When): { day: IsoDate; minutes: string } {
+  return { day: when.day, minutes: String(when.minutes) };
+}
+
+/** A When from the meal form's route, or null when absent or not usable (a future day, a bad time). */
+export function whenFromParams(params: Record<string, string | string[] | undefined>, today: IsoDate): When | null {
+  const day = typeof params.day === 'string' ? params.day : '';
+  const minutes = typeof params.minutes === 'string' ? Number(params.minutes) : NaN;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day > today || !Number.isInteger(minutes) || minutes < 0 || minutes >= DAY_MINUTES) return null;
+  return { day, minutes };
 }

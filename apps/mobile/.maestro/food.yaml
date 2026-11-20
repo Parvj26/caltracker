@@ -1,6 +1,8 @@
-# Food tab: with the coach's targets (2,000 kcal, 150 g protein; carbs and fat blank), type in a meal (Maestro toast,
-# 300 kcal, 12 g protein), see it under Today's meals and in the kcal card, log it again from "Log again in one tap",
-# find it with "Search your meals" and Use it, edit a meal, look at yesterday in the day strip, then delete all three. Photos need the camera, so they are not covered.
+# Food tab: with the coach's targets (2,000 kcal, 150 g protein; carbs and fat blank, so they show numbers, no bars),
+# + Add meal -> New meal (Maestro toast, 300 kcal, 12 g protein), see it under Today's meals and in the kcal card, log it
+# again with Add a meal's + (and Undo once), find it with a typo in "Search your meals" and save the filled-in form,
+# edit a meal, look at yesterday in the day strip, then delete all three from the ⋯ menu. Photos need the camera, so
+# they are not covered.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
 env:
@@ -32,10 +34,24 @@ env:
 - assertVisible:
     id: food-targets-by
     text: 'Targets set by .*'
+# Carbs and fat have no target: their numbers show, without an empty bar.
+- assertVisible:
+    id: food-track-protein
+- assertNotVisible:
+    id: food-track-carbs
+- assertNotVisible:
+    id: food-track-fat
 
-# Type it in.
+# Add a meal -> New meal. The meal type comes from the time.
 - tapOn:
-    id: food-type-it
+    id: food-add-meal
+- assertVisible: 'Add a meal'
+- assertVisible:
+    id: add-meal-when-label
+    text: '(Breakfast|Lunch|Dinner|Snack) · Today, .*'
+- tapOn:
+    id: add-meal-new
+- assertVisible: 'New meal'
 - tapOn:
     id: meal-name
 - inputText: 'Maestro toast'
@@ -46,7 +62,7 @@ env:
 - scrollUntilVisible:
     element:
       id: meal-kcal-hint
-- assertVisible: '≈ 48 kcal from macros'
+- assertVisible: 'Protein, carbs and fat add up to 48 kcal.'
 - tapOn:
     id: meal-calories
 - inputText: '300'
@@ -72,13 +88,26 @@ env:
     notVisible: 'Saving…'
     timeout: 20000
 
-# Log it again in one tap: two cards.
+# Add a meal's +: logs it at once with an Undo bar. Undo once, then log it for real: two cards.
+- tapOn:
+    id: food-add-meal
 - extendedWaitUntil:
     visible:
-      id: 'food-again-Maestro toast'
+      id: 'meal-log-Maestro toast'
     timeout: 10000
 - tapOn:
-    id: 'food-again-Maestro toast'
+    id: 'meal-log-Maestro toast'
+- assertVisible: 'Logged Maestro toast · 300 kcal'
+- tapOn:
+    id: food-undo
+- assertNotVisible:
+    id: food-undo-toast
+- tapOn:
+    id: 'meal-log-Maestro toast'
+- assertVisible:
+    id: food-undo-toast
+- tapOn:
+    id: add-meal-close
 - extendedWaitUntil:
     visible:
       id: food-kcal-headline
@@ -88,12 +117,12 @@ env:
     notVisible: 'Saving…'
     timeout: 20000
 
-# Search your meals: "toa" finds it; Use fills the form.
+# Search your meals, typos OK: "maestro tost" finds it; the row opens the form filled in to check, then Save.
 - tapOn:
-    id: food-type-it
+    id: food-add-meal
 - tapOn:
     id: meal-search
-- inputText: 'toa'
+- inputText: 'maestro tost'
 - tapOn:
     id: 'meal-use-Maestro toast'
 - assertVisible:
@@ -170,11 +199,9 @@ env:
       - tapOn:
           text: 'Maestro toast, .*'
           index: 0
-      - scrollUntilVisible:
-          element:
-            id: meal-delete
       - tapOn:
-          id: meal-delete
+          id: meal-more
+      - tapOn: 'Delete meal'
       - tapOn: Delete
 - extendedWaitUntil:
     visible: 'No meals yet today.'

@@ -1,5 +1,5 @@
 # Meals from <coach>: the seed coach shares "Protein oats" (450 kcal, 35 g protein, 52 g carbs, 11 g fat). Open the
-# grid from the Coach tab's "Meals from <coach> · 1" button, search with a partial word, combine chips, open the
+# grid from the Coach tab's MEALS cell ("1 from <coach>"), search with a partial word, combine chips, open the
 # recipe, log it (prefilled with its name and numbers), and see it on Food.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
 appId: app.caltracker.client
@@ -22,11 +22,11 @@ env:
     id: tab-coach
 - extendedWaitUntil:
     visible:
-      id: open-coach-meals
-      text: 'Meals from .*'
+      id: coach-strip-meals
+      text: '.*1 from .*'
     timeout: 10000
 - tapOn:
-    id: open-coach-meals
+    id: coach-strip-meals
 - extendedWaitUntil:
     visible: 'Meals from .*'
     timeout: 10000
