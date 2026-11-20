@@ -1,22 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { addDays, diffDays, formatWeight, shortDate, strengthSummary, type Units } from '@caltracker/shared';
-import { LineChart } from '@/components/charts/line-chart';
+import { heaviestChart, heaviestSessions, loadStyleOf, strengthStats, type IsoDate, type Units } from '@caltracker/shared';
 import { Card, SelectField } from '@/components/ui';
 import type { ClientStrength } from '@/lib/client-strength';
+import { ExerciseChart } from './metrics/strength/[exerciseId]/exercise-chart';
 import styles from './stickers-panel.module.css';
 
-const EPOCH = '2000-01-01';
-
-/** Strength progress: pick an exercise to chart its estimated 1RM over time. */
-export function StrengthPanel({ data, units }: { data: ClientStrength; units: Units }) {
+/**
+ * Strength progress on the client's Training tab: pick an exercise to see its heaviest weight (the headline, product
+ * owner 2026-11-19) with the change since its first session, the estimated 1-rep max second, and a chart of both per
+ * session. The same shared numbers as Metrics › Strength and the client's own Progress tab.
+ */
+export function StrengthPanel({ data, units, today }: { data: ClientStrength; units: Units; today: IsoDate }) {
   const [id, setId] = useState(data[0]?.exerciseId ?? '');
   const chosen = data.find((e) => e.exerciseId === id) ?? data[0];
+  const style = chosen ? loadStyleOf(chosen.name) : 'weight';
+  const sessions = chosen ? heaviestSessions(chosen.points, style) : [];
+  const stats = strengthStats(sessions, units, style, today);
+  const chart = chosen ? heaviestChart(chosen.name, sessions, units, style, today) : null;
   return (
     <Card className={styles.card} aria-labelledby="strength-heading">
       <h2 id="strength-heading" className={styles.heading}>Strength</h2>
-      {!chosen ? (
+      {!chosen || !chart ? (
         <p className={styles.caption}>No lifts to chart yet. They appear as the client logs weights and reps.</p>
       ) : (
         <>
@@ -25,18 +31,14 @@ export function StrengthPanel({ data, units }: { data: ClientStrength; units: Un
               <option key={e.exerciseId} value={e.exerciseId}>{e.name}</option>
             ))}
           </SelectField>
-          <LineChart
-            key={chosen.exerciseId}
-            title={`${chosen.name}, estimated one-rep max over time`}
-            points={chosen.points.map((p) => ({
-              x: diffDays(EPOCH, p.date),
-              y: p.e1rmKg,
-              label: `${shortDate(p.date)}: ${formatWeight(p.e1rmKg, units)} estimated 1RM, from ${formatWeight(p.bestSet.weightKg, units)} × ${p.bestSet.reps}`,
-            }))}
-            summary={strengthSummary(chosen.name, chosen.points, units)}
-            yLabel={(y) => formatWeight(y, units)}
-            xLabel={(x) => shortDate(addDays(EPOCH, x))}
-          />
+          <p className={styles.streak} data-testid="strength-heaviest">
+            Heaviest weight {stats.heaviest ?? '—'}
+            {stats.change ? ` · ${stats.change.text}` : stats.heaviestDetail ? ` · ${stats.heaviestDetail}` : ''}
+          </p>
+          <p className={styles.caption} data-testid="strength-e1rm">
+            {stats.e1rm ? `Est. 1-rep max ${stats.e1rm} · ${stats.e1rmDetail}` : `Est. 1-rep max: ${stats.e1rmDetail.toLowerCase()}`}
+          </p>
+          <ExerciseChart key={chosen.exerciseId} name={chosen.name} points={chart.points} summary={chart.summary} units={units} />
         </>
       )}
     </Card>

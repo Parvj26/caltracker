@@ -250,7 +250,7 @@ export default async function ClientPage({
         openOnLoad={query.add === 'workout' || query.add === 'program' ? query.add : null}
       />
       <StickersPanel data={stickers} units={units} />
-      <StrengthPanel data={strength} units={units} />
+      <StrengthPanel data={strength} units={units} today={utcToday} />
       {history ? (
         // The client header's "Message history" link lands here.
         <section id="message-history" aria-labelledby="history-heading">
