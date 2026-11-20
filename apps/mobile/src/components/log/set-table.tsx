@@ -96,7 +96,8 @@ export class FieldNav {
     if (!field || top === null) return;
     setTimeout(() => {
       field.measure((y, h) => {
-        const limit = top - KEYBOARD_BAR_HEIGHT - REVEAL_GAP;
+        // The bar's top: the keyboard's top, moved down onto iOS 26's Done row when there is one.
+        const limit = top + SYSTEM_DONE_ROW - KEYBOARD_BAR_HEIGHT - REVEAL_GAP;
         if (this.current === key && y + h > limit) this.scrollers.get(field.page)?.(y + h - limit);
       });
     }, REVEAL_AFTER_MS);
@@ -124,13 +125,20 @@ export const FieldNavContext = createContext<FieldNav | null>(null);
 /** iOS 26 puts its own Done above a number pad: the bar then only adds ‹ › (one Done, not two). */
 const SYSTEM_DONE = Platform.OS === 'ios' && parseInt(String(Platform.Version), 10) >= 26;
 
+/**
+ * iOS 26's Done floats in a clear row at the top of the keyboard's frame, above the keys. The bar sits down in that
+ * row, so ‹ › and Done share one line (approved Logger board) instead of Done hanging under the bar. Measured on the
+ * iOS 26 simulator: the row is 50 pt.
+ */
+const SYSTEM_DONE_ROW = SYSTEM_DONE ? 50 : 0;
+
 /** A new box gets the cursor this long after it appears (the menu sheet closes first). */
 const FOCUS_AFTER_MS = 350;
 
 /** Height of the bar above the number pad. */
 export const KEYBOARD_BAR_HEIGHT = 56;
-/** Space kept between a focused box and the bar. */
-const REVEAL_GAP = 8;
+/** Space kept between a focused box and the bar: the rest of its row (padding, the outline) and a margin. */
+const REVEAL_GAP = 20;
 /** Lets iOS's own scroll (above the keyboard) settle before checking the bar. */
 const REVEAL_AFTER_MS = 120;
 
@@ -176,7 +184,7 @@ export const KeyboardBar = memo(function KeyboardBar({ nav }: { nav: FieldNav })
   return (
     <View ref={layer} onLayout={measure} pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {show && layerBottom !== null && keyboardTop !== null ? (
-    <View testID="keyboard-bar" style={[styles.bar, { bottom: layerBottom - keyboardTop, paddingHorizontal: space[2.5] }]}>
+    <View testID="keyboard-bar" style={[styles.bar, { bottom: layerBottom - keyboardTop - SYSTEM_DONE_ROW, paddingHorizontal: space[2.5] }]}>
       <Pressable
         testID="keyboard-prev"
         onPress={() => prev?.()}

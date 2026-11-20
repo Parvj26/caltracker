@@ -240,6 +240,16 @@ env:
 - takeScreenshot: lt1-after
 - tapOn:
     id: tick-3-0-0
+# The last set's box, focused: its whole row stays above the ‹ › bar, with Done on the bar's line.
+- scrollUntilVisible:
+    element:
+      id: actual-reps-3-0-3
+    direction: DOWN
+- tapOn:
+    id: actual-reps-3-0-3
+- waitForAnimationToEnd
+- takeScreenshot: lt1-last-set-keyboard
+- pressKey: Enter
 
 # ---- Pick one: locks after the first set (LT2) ----
 - swipe:
