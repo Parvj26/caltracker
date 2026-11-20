@@ -19,11 +19,24 @@ env:
     visible:
       id: settings-notifications
     timeout: 10000
-- assertVisible: 'Workouts & reminders'
+# iOS may not have asked yet: "Turn on notifications" asks, and the groups come back on from "Paused".
+- runFlow:
+    when:
+      visible:
+        id: settings-notifications-open
+    commands:
+      - tapOn:
+          id: settings-notifications-open
+      - tapOn:
+          text: Allow
+          optional: true
+- assertNotVisible:
+    id: settings-notifications-open
+- assertVisible: 'Workouts & reminders.*'
 - assertVisible: 'Messages from .*'
 - assertVisible:
-    id: settings-notifications-coach-value
-    text: 'On'
+    id: settings-notifications-coach
+    text: 'Messages from .*, On'
 - assertNotVisible:
     id: settings-notifications-open
 - tapOn:
@@ -39,8 +52,8 @@ env:
 - tapOn:
     id: notifications-settings-back
 - assertVisible:
-    id: settings-notifications-coach-value
-    text: '2 of 3 on'
+    id: settings-notifications-coach
+    text: 'Messages from .*, 2 of 3 on'
 - tapOn:
     id: settings-notifications-coach
 - assertVisible:
@@ -52,11 +65,29 @@ env:
     direction: DOWN
 - tapOn:
     id: notif-time-quietStart
+- scrollUntilVisible:
+    element: '11:00 PM'
+    direction: DOWN
 - tapOn: '11:00 PM'
+- scrollUntilVisible:
+    element:
+      id: notifications-settings-back
+    direction: UP
 - tapOn:
     id: notifications-settings-back
+# Put the defaults back for the next run: the message switch first (top), then the quiet-hours start.
 - tapOn:
     id: settings-notifications
+# The switches work once the server's copy is in ("Loading your settings…" gone).
+- extendedWaitUntil:
+    notVisible:
+      id: notifications-prefs-note
+    timeout: 10000
+- tapOn:
+    id: notif-switch-message
+- assertVisible:
+    id: notif-switch-message
+    checked: true
 - scrollUntilVisible:
     element:
       id: notif-time-quietStart
@@ -64,18 +95,22 @@ env:
 - assertVisible:
     id: notif-time-quietStart
     text: '.*11:00 PM.*'
-# Put the defaults back for the next run.
 - tapOn:
     id: notif-time-quietStart
+- scrollUntilVisible:
+    element: '10:00 PM'
+    direction: UP
 - tapOn: '10:00 PM'
+- waitForAnimationToEnd
+- assertVisible:
+    id: notif-time-quietStart
+    text: '.*10:00 PM.*'
 - scrollUntilVisible:
     element:
-      id: notif-switch-message
+      id: notifications-settings-back
     direction: UP
-- tapOn:
-    id: notif-switch-message
 - tapOn:
     id: notifications-settings-back
 - assertVisible:
-    id: settings-notifications-coach-value
-    text: 'On'
+    id: settings-notifications-coach
+    text: 'Messages from .*, On'

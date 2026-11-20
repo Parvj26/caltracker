@@ -9,12 +9,8 @@ appId: app.caltracker.client
 - assertNotVisible: 'New PRs'
 - tapOn:
     id: submit-button
-- assertVisible:
-    id: email-input-error
-    text: '.*Enter your email address.*'
-- assertVisible:
-    id: password-input-error
-    text: '.*Enter your password.*'
+- assertVisible: 'Enter your email address.'
+- assertVisible: 'Enter your password.'
 - tapOn:
     id: email-input
 - inputText: 'maya@example'
@@ -26,6 +22,4 @@ appId: app.caltracker.client
     id: toggle-password
 - assertVisible: 'secret-pass'
 - runFlow: helpers/submit.yaml
-- assertVisible:
-    id: email-input-error
-    text: '.*Enter a full email address.*'
+- assertVisible: 'Enter a full email address.'

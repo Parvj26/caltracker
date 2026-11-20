@@ -71,8 +71,14 @@ env:
 # Settings is its own screen: the grey ‹ goes back to Today. Sign out asks first; Cancel keeps you signed in.
 - tapOn:
     id: today-settings
-- assertVisible:
-    id: sign-out
+- scrollUntilVisible:
+    element:
+      id: sign-out
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      id: settings-close
+    direction: UP
 - tapOn:
     id: settings-close
 - assertNotVisible:
@@ -91,10 +97,10 @@ env:
     id: sign-out
 - tapOn:
     id: sign-out
-# The alert's own Sign out button (the screen's button sits behind it).
+# The alert's own Sign out button, beside its Cancel (the screen's Sign out sits behind the alert).
 - tapOn:
     text: 'Sign out'
-    index: 1
+    rightOf: 'Cancel'
 - extendedWaitUntil:
     visible:
       id: email-input
