@@ -70,7 +70,7 @@ async function send(ids: Ids, state: AppleHealthState): Promise<{ state: AppleHe
     {
       userId: ids.userId,
       currentUserId: signedInId,
-      upsert: (samples) => syncAppleHealthMetrics(ids.workspaceId, samples),
+      upsert: (samples) => syncAppleHealthMetrics(ids.workspaceId, samples, async () => (await signedInId()) === ids.userId),
       remove: (externalIds) => deleteMyAppleHealthMetrics(ids.workspaceId, externalIds),
       isNetworkFailure: (e) => isNetworkFailure((e as { cause?: unknown }).cause ?? e),
     },

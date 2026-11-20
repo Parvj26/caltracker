@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MetricEntry } from '@caltracker/shared';
-import { appleHealthBatches, chunk, parseCachedMetrics, serializeMetrics } from './metrics-logic';
+import { SIGNED_OUT_MIDWAY, appleHealthBatches, chunk, parseCachedMetrics, sendBatches, serializeMetrics } from './metrics-logic';
 
 const NOW = new Date('2026-11-19T12:00:00Z');
 
@@ -79,5 +79,19 @@ describe('appleHealthBatches dates with a time-zone offset', () => {
   });
   it('skips a time it cannot read', () => {
     expect(appleHealthBatches([s('2026-11-18', 'not a time')], NOW).flat()).toEqual([]);
+  });
+});
+
+describe('sendBatches', () => {
+  it('checks the account before every batch and sends the rest only while it is the same', async () => {
+    const sent: number[] = [];
+    let checks = 0;
+    const stillOk = () => Promise.resolve(++checks <= 2);
+    await expect(sendBatches([1, 2, 3], stillOk, (b) => (sent.push(b), Promise.resolve(b)))).rejects.toThrow(SIGNED_OUT_MIDWAY);
+    expect(sent).toEqual([1, 2]);
+    expect(checks).toBe(3);
+  });
+  it('adds up what each batch changed', async () => {
+    expect(await sendBatches([2, 3], () => Promise.resolve(true), (b) => Promise.resolve(b))).toBe(5);
   });
 });

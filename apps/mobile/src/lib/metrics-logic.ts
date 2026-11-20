@@ -120,3 +120,18 @@ export function appleHealthBatches(samples: readonly AppleHealthSample[], now = 
   }));
   return chunk(rows, size);
 }
+
+export const SIGNED_OUT_MIDWAY = 'Signed out while sending Apple Health readings.';
+
+/**
+ * Sends `batches` one after another, asking `stillOk` before each (so a different account signed in halfway gets none
+ * of the rest). Throws SIGNED_OUT_MIDWAY when it says no. Returns the sum of what `send` returned.
+ */
+export async function sendBatches<T>(batches: readonly T[], stillOk: () => Promise<boolean>, send: (batch: T) => Promise<number>): Promise<number> {
+  let total = 0;
+  for (const batch of batches) {
+    if (!(await stillOk())) throw new Error(SIGNED_OUT_MIDWAY);
+    total += await send(batch);
+  }
+  return total;
+}

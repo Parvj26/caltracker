@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { randomUUID } from 'expo-crypto';
 import { readAllPages, toMetricEntries, type IsoDate, type MetricEntry, type MetricKey } from '@caltracker/shared';
 import { progressCachePrefix } from './device-cache-keys';
-import { DELETE_CHUNK, appleHealthBatches, chunk, parseCachedMetrics, serializeMetrics, type AppleHealthSample } from './metrics-logic';
+import { DELETE_CHUNK, appleHealthBatches, chunk, sendBatches, parseCachedMetrics, serializeMetrics, type AppleHealthSample } from './metrics-logic';
 import { supabase } from './supabase';
 
 export const METRICS_LOAD_FAILED = 'Something went wrong. Pull down to try again.';
@@ -117,18 +117,24 @@ export async function deleteMyMetric(id: string): Promise<void> {
   }
 }
 
-/** Sends Apple Health samples (in stored units). Returns how many entries were added or changed. */
-export async function syncAppleHealthMetrics(workspaceId: string, samples: readonly AppleHealthSample[]): Promise<number> {
-  let changed = 0;
-  for (const batch of appleHealthBatches(samples)) {
+/**
+ * Sends Apple Health samples (in stored units), 500 at a time. `stillOk` runs before every batch (the caller checks the
+ * same account is still signed in); when it says no, the rest is not sent and this throws SIGNED_OUT_MIDWAY.
+ * Returns how many entries were added or changed.
+ */
+export async function syncAppleHealthMetrics(
+  workspaceId: string,
+  samples: readonly AppleHealthSample[],
+  stillOk: () => Promise<boolean> = () => Promise.resolve(true),
+): Promise<number> {
+  return sendBatches(appleHealthBatches(samples), stillOk, async (batch) => {
     const { data, error } = await supabase.rpc('sync_apple_health_metrics', { p_workspace_id: workspaceId, p_samples: batch });
     if (error) {
       warn('apple health sync', error);
       throw withCode(APPLE_HEALTH_SYNC_FAILED, error);
     }
-    changed += data;
-  }
-  return changed;
+    return data;
+  });
 }
 
 /**
