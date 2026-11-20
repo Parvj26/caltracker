@@ -13,7 +13,7 @@ import { loadFeed, memberCount, myProfile, namesOf, type FeedPost } from '@/lib/
 import { useLive } from '@/lib/community-live';
 import { useCommunity } from '@/lib/use-community';
 import { useSession } from '@/lib/session';
-import { offlinePillA11y } from '@/lib/offline-pill';
+import { COMMUNITY_OFFLINE_EMPTY, communityOfflineState, offlinePillA11y } from '@/lib/offline-pill';
 import { useUnits } from '@/lib/use-units';
 import { palette, pressedOpacity, white, TITLE_MAX_SCALE } from '@/theme/theme';
 import { useTheme } from '@/theme/use-theme';
@@ -119,6 +119,7 @@ export default function CommunityScreen() {
     { key: 'wins', label: 'Wins' },
   ];
   const circle = [styles.circle, { borderRadius: radius.pill }];
+  const offlineState = communityOfflineState({ ready, offline, hasCommunity: community !== null });
 
   return (
     <Screen
@@ -134,11 +135,11 @@ export default function CommunityScreen() {
         <View style={styles.flex} accessibilityRole="header" accessible accessibilityLabel={[
             'Community',
             subtitle,
-            ready && offline ? offlinePillA11y(false).label : null,
+            offlineState === 'pill' ? offlinePillA11y(false).label : null,
           ]
             .filter(Boolean)
             .join(', ')}>
-          <OfflineTitle offline={ready && offline}>
+          <OfflineTitle offline={offlineState === 'pill'}>
             <Text style={text('screenTitle')} maxFontSizeMultiplier={TITLE_MAX_SCALE}>
               Community
             </Text>
@@ -171,6 +172,11 @@ export default function CommunityScreen() {
           </Text>
           <Text style={text('body')}>Your coach has taken you out of the group. You can still train and message your coach as usual.</Text>
         </Card>
+      ) : null}
+      {offlineState === 'empty' ? (
+        <Text style={text('body')} testID="community-offline">
+          {COMMUNITY_OFFLINE_EMPTY}
+        </Text>
       ) : null}
 
       {community && ctx ? (

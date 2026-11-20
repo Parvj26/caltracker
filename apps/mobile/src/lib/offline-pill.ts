@@ -15,3 +15,15 @@ export function offlinePillA11y(open: boolean): { label: string; hint: string; e
     expanded: open,
   };
 }
+
+/** Community's empty state offline with nothing saved (a cold start): the pill would claim a saved copy. */
+export const COMMUNITY_OFFLINE_EMPTY = 'Offline. The community shows when you’re back online.';
+
+/**
+ * What Community shows offline: the pill while a saved copy is on screen, the empty-state line when nothing was saved
+ * (the pill's "Saved on your phone" would not be true), else nothing.
+ */
+export function communityOfflineState(p: { ready: boolean; offline: boolean; hasCommunity: boolean }): 'pill' | 'empty' | null {
+  if (!p.ready || !p.offline) return null;
+  return p.hasCommunity ? 'pill' : 'empty';
+}
