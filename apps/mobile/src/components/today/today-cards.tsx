@@ -69,8 +69,8 @@ const TILE_GAP = 6;
 
 /** The coach chat: the Coach tab's first screen. */
 export const COACH_CHAT_HREF = '/coach';
-/** The add-meal sheet (batch B, PR #176: /food/add); cast until that route is on this branch. */
-const ADD_MEAL_HREF = '/food/add' as Href;
+/** The add-meal sheet. */
+const ADD_MEAL_HREF = '/food/add';
 
 /** Where Preview goes: the Workouts tab's Preview screen (plan, totals and a sticky Start). */
 export const previewHref = (id: string): Href => ({ pathname: '/plan/[id]', params: { id } });
