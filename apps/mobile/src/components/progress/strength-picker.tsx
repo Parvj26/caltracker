@@ -9,7 +9,7 @@ import { useTheme } from '@/theme/use-theme';
 
 /**
  * The searchable exercise list for the Strength screen: recently trained first, then every exercise grouped by its
- * primary muscle, each with its best estimated max.
+ * primary muscle, each with its heaviest weight.
  */
 export function StrengthPicker({
   visible,
@@ -60,13 +60,13 @@ export function StrengthPicker({
           )}
           renderItem={({ item }) => {
             const on = item.exerciseId === selectedId;
-            const best = item.bestKg > 0 ? `best ${formatWeight(item.bestKg, units)}` : '';
+            const best = item.bestKg > 0 ? `heaviest ${formatWeight(item.bestKg, units)}` : '';
             return (
               <Pressable
                 testID={`strength-pick-${item.name}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
-                accessibilityLabel={`${item.name}${best ? `, ${best} estimated max` : ''}`}
+                accessibilityLabel={`${item.name}${best ? `, ${best}` : ''}`}
                 onPress={() => {
                   onPick(item.exerciseId);
                   setQuery('');

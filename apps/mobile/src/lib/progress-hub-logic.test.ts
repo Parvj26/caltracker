@@ -80,6 +80,9 @@ describe('buildHub', () => {
     expect(addedDays(h)).toEqual(['2026-11-04']);
     expect(h.finished.map((f) => f.day)).toEqual(['2026-11-02', '2026-11-04']);
     expect([...prKeys(h)]).toEqual(['l2|sq']);
+    // The Strength screen's heaviest-weight headline and session rows read these.
+    expect(h.exercises[0].points.map((p) => p.logId)).toEqual(['l1', 'l2']);
+    expect(h.exercises[0].points[0]?.heaviestSet).toBeDefined();
   });
 });
 
@@ -91,6 +94,11 @@ describe('the saved copies', () => {
     expect(parseHubCache('nope')).toBeNull();
     expect(parseHubCache(JSON.stringify({ ...h, version: 0 }))).toBeNull();
     expect(parseHubCache(JSON.stringify({ ...h, exercises: 'x' }))).toBeNull();
+  });
+  it('still reads a hub saved by an older build, whose points have no heaviest set or log', () => {
+    const h = hub();
+    const old = { ...h, exercises: h.exercises.map((e) => ({ ...e, points: e.points.map((p) => ({ date: p.date, e1rmKg: p.e1rmKg, bestSet: p.bestSet })) })) };
+    expect(parseHubCache(JSON.stringify(old))?.exercises[0]?.points).toHaveLength(2);
   });
   it('reads back the food range', () => {
     const f = { meals: [{ eatenOn: '2026-11-02', hasPhoto: false, macros: { calories: 1, protein: null, carbs: null, fat: null } }], targets: null };

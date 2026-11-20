@@ -8,6 +8,7 @@ import type { IsoDate } from '../dates/dates';
 import { buildExerciseIndex, searchExercises } from '../exercises/search';
 import type { WorkoutLogDoc } from '../logs/schema';
 import { formatWeight, fromKg, groupThousands } from '../units/units';
+import { heaviestTile } from './heaviest';
 import type { Units } from '../units/units';
 
 /**
@@ -75,21 +76,15 @@ export function strengthHeadline(
   return { value, change: `−${amount(diff, units)} since ${since}`, line: `Your estimated max is ${amount(diff, units)} under ${since}. Ups and downs are normal.` };
 }
 
-/** The Strength tile on Progress: the most-trained exercise and its 3-month change in estimated max. */
+/** The Strength tile on Progress: the most-trained exercise and its 3-month change in heaviest weight (heaviest.ts). */
 export function strengthTile(exercises: readonly StrengthExerciseLite[], units: Units, today: IsoDate): { value: string; sub: string } {
   const top =
     mostTrained(exercises, today, 1)[0] ??
     [...exercises].sort((a, b) => ((a.points.at(-1)?.date ?? '') < (b.points.at(-1)?.date ?? '') ? 1 : -1))[0];
-  const last = top?.points.at(-1);
-  if (!top || !last) return { value: 'No lifts yet', sub: 'log a workout to start' };
-  const recent = pointsInRange(top.points, '3m', today);
-  const first = recent[0];
-  if (recent.length < 2 || !first) return { value: `${top.name} ${formatWeight(last.e1rmKg, units)}`, sub: 'est. max' };
-  const diff = shownChange(first.e1rmKg, last.e1rmKg, units);
-  const sign = diff > 0 ? '+' : diff < 0 ? '−' : '±';
-  return { value: `${top.name} ${sign}${amount(diff, units)}`, sub: `est. max since ${formatShortDate(first.date, today)}` };
+  return heaviestTile(top, units, today);
 }
 
+/** `bestKg`: the heaviest weight lifted (the headline, 2026-11-19). */
 export type PickerItem = { exerciseId: string; name: string; bestKg: number };
 export type PickerSection = { title: string; items: PickerItem[] };
 
@@ -97,13 +92,13 @@ const titleCase = (s: string) => s.replace(/^\p{L}/u, (c) => c.toUpperCase());
 
 /**
  * The exercise list: with no search, the most recently trained first, then every exercise grouped by its primary
- * muscle ("Other" when unknown); with a search, the matches by name. Each shows its best estimated max.
+ * muscle ("Other" when unknown); with a search, the matches by name. Each shows its heaviest weight.
  */
 export function strengthPickerSections(exercises: readonly StrengthExerciseLite[], query: string, recentCount = 5): PickerSection[] {
   const item = (e: StrengthExerciseLite): PickerItem => ({
     exerciseId: e.exerciseId,
     name: e.name,
-    bestKg: e.points.reduce((m, p) => Math.max(m, p.e1rmKg), 0),
+    bestKg: e.points.reduce((m, p) => Math.max(m, (p.heaviestSet ?? p.bestSet).weightKg), 0),
   });
   const byName = (a: StrengthExerciseLite, b: StrengthExerciseLite) => a.name.localeCompare(b.name);
   const lastDate = (e: StrengthExerciseLite) => e.points.at(-1)?.date ?? '';
