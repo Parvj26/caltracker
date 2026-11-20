@@ -18,7 +18,7 @@ select is(
    join pg_tables t on t.schemaname = 'public' and t.tablename = c.table_name
    where c.table_schema = 'public' and c.column_name = 'workspace_id'),
   array[
-    'award_bonus_queue', 'awards', 'body_measurements', 'client_documents', 'client_goals', 'client_invite_plan_items', 'client_invites',
+    'award_bonus_queue', 'awards', 'body_measurements', 'body_metrics', 'client_documents', 'client_goals', 'client_invite_plan_items', 'client_invites',
     'client_limitations', 'client_notes', 'client_stats', 'coach_meals', 'communities', 'community_blocks',
     'community_comments', 'community_members', 'community_notifications', 'community_post_images', 'community_posts',
     'community_reactions', 'community_reports', 'conversations', 'custom_metrics', 'exercise_overrides', 'exercise_prefs',
@@ -255,6 +255,8 @@ insert into public.conversation_reads (conversation_id, user_id) values (:'conv'
 insert into public.body_measurements (workspace_id, client_id, measured_on, entered_by, source)
 values (:'ws', :'vic', current_date, :'coach', 'coach') returning id as scan \gset
 insert into public.body_measurement_values (measurement_id, metric_key, value) values (:'scan', 'weight_kg', 80);
+insert into public.body_metrics (workspace_id, client_id, metric_key, value, measured_on, source, entered_by_role, entered_by)
+values (:'ws', :'vic', 'waist_cm', 80, current_date, 'manual', 'coach', :'coach');
 select gen_random_uuid() as doc_file \gset
 insert into public.client_documents (workspace_id, client_id, name, storage_path, content_type, size_bytes, uploaded_by)
 values (:'ws', :'vic', 'InBody', :'ws' || '/' || :'vic' || '/' || :'doc_file' || '.pdf', 'application/pdf', 100, :'coach');

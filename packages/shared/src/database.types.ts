@@ -298,6 +298,62 @@ export type Database = {
           },
         ]
       }
+      body_metrics: {
+        Row: {
+          client_id: string
+          created_at: string
+          entered_by: string | null
+          entered_by_role: string
+          external_id: string | null
+          id: string
+          measured_at: string | null
+          measured_on: string
+          metric_key: string
+          source: string
+          updated_at: string
+          value: number
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          entered_by?: string | null
+          entered_by_role: string
+          external_id?: string | null
+          id?: string
+          measured_at?: string | null
+          measured_on: string
+          metric_key: string
+          source: string
+          updated_at?: string
+          value: number
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          entered_by?: string | null
+          entered_by_role?: string
+          external_id?: string | null
+          id?: string
+          measured_at?: string | null
+          measured_on?: string
+          metric_key?: string
+          source?: string
+          updated_at?: string
+          value?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_metrics_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_documents: {
         Row: {
           client_id: string
@@ -2870,7 +2926,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      metric_entries: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          entered_by: string | null
+          entered_by_role: string | null
+          external_id: string | null
+          id: string | null
+          measured_at: string | null
+          measured_on: string | null
+          metric_key: string | null
+          origin: string | null
+          source: string | null
+          value: number | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invite_for: {
@@ -3487,6 +3560,10 @@ export type Database = {
           bucket_id: string
           name: string
         }[]
+      }
+      sync_apple_health_metrics: {
+        Args: { p_samples: Json; p_workspace_id: string }
+        Returns: number
       }
       take_over_workout_log: { Args: { p_log_id: string }; Returns: Json }
       unassign_program: {
