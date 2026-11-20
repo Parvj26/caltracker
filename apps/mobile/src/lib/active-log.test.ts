@@ -147,6 +147,9 @@ describe('parseActualInput', () => {
     expect(parseActualInput('abc', 'weight')).toBeUndefined();
     expect(parseActualInput('1:30', 'duration')).toBe(90);
     expect(parseActualInput('1:75', 'duration')).toBeUndefined();
+    // Digits without a colon read like a microwave timer: 130 is 1:30, 190 is refused.
+    expect(parseActualInput('130', 'duration')).toBe(90);
+    expect(parseActualInput('190', 'duration')).toBeUndefined();
     expect(parseActualInput('5.2', 'distance')).toBe(5.2);
   });
 });
