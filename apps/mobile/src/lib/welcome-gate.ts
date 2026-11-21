@@ -28,6 +28,7 @@ export const welcomeGate = {
     send({ type: 'resume', backgroundedAt, now, onToday: today.focused, workoutInProgress: today.workoutInProgress }),
   /** Today's load is done: the welcome fades into it. */
   todayReady: () => send({ type: 'ready' }),
+  minElapsed: () => send({ type: 'min-elapsed' }),
   noToday: () => send({ type: 'no-today' }),
   timedOut: () => send({ type: 'timeout' }),
   /** Today says whether it is the screen in view and whether a workout is in progress. */

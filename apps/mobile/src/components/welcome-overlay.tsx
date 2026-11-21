@@ -1,13 +1,14 @@
 // The welcome on a fresh open (approved Welcome board): the splash's logo stays put, "Welcome back, Parv" fades in
-// under it while Today's first load is pending, then it all fades into Today. It never adds waiting: it leaves the
-// moment Today is ready (welcome-gate), or at once when there is no Today to wait for (signed out, no coach).
+// under it, then it all fades into Today. It leaves at the later of Today being ready and 800 ms on screen (so it
+// always reads as a deliberate welcome; welcome-gate), after 1.5 s at most, or at once when there is no Today to wait
+// for (signed out, no coach).
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Animated, Image, StyleSheet, Text } from 'react-native';
 import { useReduceMotion } from '@/components/ui/button';
 import { useSession } from '@/lib/session';
 import { readCachedFirstName, readCachedFirstTime } from '@/lib/today-api';
 import { welcomeGate, useWelcomeState } from '@/lib/welcome-gate';
-import { WELCOME_FADE_MS, WELCOME_MAX_MS, WELCOME_NAME_FADE_MS, welcomeText, type WelcomeText } from '@/lib/welcome-logic';
+import { WELCOME_FADE_MS, WELCOME_MAX_MS, WELCOME_MIN_MS, WELCOME_NAME_FADE_MS, welcomeText, type WelcomeText } from '@/lib/welcome-logic';
 import { fontFamilyFor } from '@/theme/fonts';
 import { palette } from '@/theme/theme';
 // The native splash's own image at its own size (app.json: expo-splash-screen, imageWidth 120), so the hand-over is seamless.
@@ -50,11 +51,16 @@ export function WelcomeOverlay() {
     if (showing && !loading && (session === null || workspace === null)) welcomeGate.noToday();
   }, [showing, loading, session, workspace]);
 
-  // Only a ceiling, never a wait: if Today's signal never comes (a deep link elsewhere), the app is not stuck behind it.
+  // At least WELCOME_MIN_MS on screen (so it reads as a welcome, not a flash), and at most WELCOME_MAX_MS if Today's
+  // signal never comes (a deep link elsewhere), so the app is never stuck behind it.
   useEffect(() => {
     if (!showing) return;
-    const t = setTimeout(welcomeGate.timedOut, WELCOME_MAX_MS);
-    return () => clearTimeout(t);
+    const min = setTimeout(welcomeGate.minElapsed, WELCOME_MIN_MS);
+    const max = setTimeout(welcomeGate.timedOut, WELCOME_MAX_MS);
+    return () => {
+      clearTimeout(min);
+      clearTimeout(max);
+    };
   }, [showing, opens]);
 
   // The name saved on the phone (Today saves it on each load); without one, just the logo.
