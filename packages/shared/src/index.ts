@@ -784,3 +784,6 @@ export { readAllPages } from './metrics/pages';
 export { metricDayText, metricEntryMeta, metricEntryWho, metricValueParts } from './metrics/card';
 export { clientCopyName, libraryNameKey, libraryNameTaken } from './workouts/library-name';
 export { compactExerciseName, exerciseNameKey, findNearDuplicate, sameExerciseName } from './exercises/near-duplicate';
+
+// Body map: the muscle-group catalogue, the figure's drawing, and client flags (pains, injuries, limitations).
+export * from './anatomy';
