@@ -443,7 +443,7 @@ export function CorrectiveDialog({
             ) : null}
             <details className={styles.listPick}>
               <summary>Pick from the list</summary>
-              <div className={styles.muscleGrid} role="group" aria-label="Muscle groups">
+              <div className={styles.muscleGrid} role="group" aria-label="Muscle group list">
                 {MUSCLE_GROUPS.map((m) => (
                   <button
                     key={m.id}

@@ -96,11 +96,15 @@
   gap: var(--ct-space-3);
   min-width: 0;
 }
-.paneActions { display: flex; justify-content: flex-end; gap: var(--ct-space-2); order: 2; }
-.pane > :last-child { order: 1; }
+@media (max-width: 599.98px) {
+  .createButton { width: 100%; }
+}
 
 .summary { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
-.summaryHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); }
+.summaryHead { display: flex; align-items: center; gap: var(--ct-space-2); min-width: 0; }
+.summaryHead > * { flex: none; }
+.summaryHead > .summaryTitle { flex: 0 1 auto; min-width: 0; }
+.summaryActions { display: inline-flex; align-items: center; gap: var(--ct-space-2); margin-left: auto; }
 .summaryTitle { margin: 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere; }
 .summaryDir { display: flex; align-items: center; gap: var(--ct-space-2); margin: 0; }
 .summarySection { display: flex; flex-direction: column; gap: var(--ct-space-2); }
@@ -226,3 +230,7 @@
 .photoRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-3); }
 
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* The phone header: "+ Corrective exercise" full width on its own row (board AS8). */
+@media (max-width: 599.98px) {
+  .page header > div > div:last-child:has(.createButton) { flex: 1 1 100%; }
+}

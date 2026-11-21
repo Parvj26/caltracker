@@ -85,7 +85,7 @@ export function CorrectiveLibrary({
         count={items.length}
         stackOnPhone
         action={
-          <Button variant="create" onClick={() => setDialog({ step: 'edit', item: null })} data-ph-capture-attribute-label="corrective_new" phSafe>
+          <Button variant="create" className={styles.createButton} onClick={() => setDialog({ step: 'edit', item: null })} data-ph-capture-attribute-label="corrective_new" phSafe>
             + Corrective exercise
           </Button>
         }
@@ -127,9 +127,12 @@ export function CorrectiveLibrary({
               {groups.map((g) => (
                 <section key={`${g.direction}.${g.muscleId}`} className={styles.group} aria-labelledby={`grp-${g.direction}-${g.muscleId}`}>
                   <header className={styles.groupHead}>
-                    <h2 id={`grp-${g.direction}-${g.muscleId}`} className={styles.groupTitle}>
+                    <h2
+                      id={`grp-${g.direction}-${g.muscleId}`}
+                      className={styles.groupTitle}
+                      aria-label={`${muscleGroup(g.muscleId)?.name ?? g.muscleId}, ${DIRECTION_LABELS[g.direction].long.toLowerCase()}`}
+                    >
                       {muscleGroup(g.muscleId)?.name ?? g.muscleId}
-                      <span className={styles.srOnly}>, {DIRECTION_LABELS[g.direction].long.toLowerCase()}</span>
                     </h2>
                     <span aria-hidden="true">
                       <DirectionTag direction={g.direction} />
@@ -166,24 +169,26 @@ export function CorrectiveLibrary({
 
         {wide && current ? (
           <aside className={styles.pane} aria-label="Open corrective exercise" data-testid="corrective-pane">
-            <div className={styles.paneActions}>
-              {current.yours ? (
-                <>
+            <CorrectiveSummary
+              item={current}
+              actions={
+                current.yours ? (
+                  <>
+                    <Button variant="secondary" size="compact" onClick={() => setDialog({ step: 'edit', item: current })}>
+                      Edit
+                    </Button>
+                    <MoreMenu
+                      label={`More for ${current.name}`}
+                      items={[{ label: 'Delete…', danger: true, onSelect: () => setDialog({ step: 'delete', item: current }) }]}
+                    />
+                  </>
+                ) : (
                   <Button variant="secondary" size="compact" onClick={() => setDialog({ step: 'edit', item: current })}>
-                    Edit
+                    Make it yours
                   </Button>
-                  <MoreMenu
-                    label={`More for ${current.name}`}
-                    items={[{ label: 'Delete…', danger: true, onSelect: () => setDialog({ step: 'delete', item: current }) }]}
-                  />
-                </>
-              ) : (
-                <Button variant="secondary" size="compact" onClick={() => setDialog({ step: 'edit', item: current })}>
-                  Make it yours
-                </Button>
-              )}
-            </div>
-            <CorrectiveSummary item={current} />
+                )
+              }
+            />
           </aside>
         ) : null}
       </div>

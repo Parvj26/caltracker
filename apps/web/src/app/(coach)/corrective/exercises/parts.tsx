@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { DIRECTION_LABELS, EVIDENCE_LABELS, doseText, type CorrectiveDirection } from '@caltracker/shared';
 import { Chip } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/chevron-icon';
@@ -52,7 +53,7 @@ export function MuscleChips({ item }: { item: Pick<LibraryItem, 'muscles'> }) {
 }
 
 /** What a corrective is (desktop's pane, the phone and iPad pop-up's first step). */
-export function CorrectiveSummary({ item, headingLevel = 2 }: { item: LibraryItem; headingLevel?: 2 | 3 }) {
+export function CorrectiveSummary({ item, headingLevel = 2, actions }: { item: LibraryItem; headingLevel?: 2 | 3; actions?: ReactNode }) {
   const H = headingLevel === 2 ? 'h2' : 'h3';
   return (
     <div className={styles.summary}>
@@ -60,6 +61,7 @@ export function CorrectiveSummary({ item, headingLevel = 2 }: { item: LibraryIte
       <div className={styles.summaryHead}>
         <H className={styles.summaryTitle}>{item.name}</H>
         {item.yours ? <YoursChip /> : null}
+        {actions ? <span className={styles.summaryActions}>{actions}</span> : null}
       </div>
       <p className={styles.summaryDir}>
         <DirectionTag direction={item.direction} /> <span className={styles.muted}>{DIRECTION_LABELS[item.direction].action}</span>
