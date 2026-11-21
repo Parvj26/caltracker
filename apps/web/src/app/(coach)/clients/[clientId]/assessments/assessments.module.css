@@ -440,4 +440,5 @@
 
 /* ---------- Step 2 in the report and Compare (step2-slots.tsx) ---------- */
 .compareMaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--ct-space-4); }
-.compareMap { display: flex; flex-direction: column; align-items: center; gap: var(--ct-space-2); min-width: 0; }
+/* Stretch, not center: the map is a size container (inline-size), so a centred one would shrink to 0 px wide. */
+.compareMap { display: flex; flex-direction: column; align-items: stretch; gap: var(--ct-space-2); min-width: 0; text-align: center; }

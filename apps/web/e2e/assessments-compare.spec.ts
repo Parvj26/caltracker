@@ -209,6 +209,20 @@ for (const { size, use } of SIZES) {
       await page.emulateMedia({ media: 'screen' });
 
       // ---- Compare (AS7) ----
+      // A confirmed muscle mark on each, so Compare has body maps to draw.
+      const { data: done } = await admin.from('assessments').select('id, slot').eq('client_id', clientId);
+      for (const a of done ?? []) {
+        const { error } = await admin.from('assessment_muscle_marks').insert({
+          assessment_id: a.id,
+          workspace_id: workspaceId,
+          muscle_id: 'glute_medius',
+          side: 'L',
+          status: a.slot === 'initial' ? 'under' : 'normal',
+          review: 'confirmed',
+          sources: ['ohs.knee_valgus'],
+        });
+        expect(error).toBeNull();
+      }
       await page.getByRole('link', { name: 'Compare', exact: true }).click();
       await expect(page).toHaveURL(/\/assessments\/compare\/[0-9a-f-]{36}$/);
       await expect(page.getByRole('heading', { level: 1, name: 'Compare · Cycle 1' })).toBeVisible();
@@ -218,6 +232,14 @@ for (const { size, use } of SIZES) {
       await expect(perTest).toHaveText([/Overhead squat\s*67 → 83\s*\+16/, /Shoulder mobility\s*75 → 100\s*\+25/]);
       await expect(page.getByTestId('finding-counts')).toHaveText(/5 improved\s*1 same\s*1 new\s*0 worse/);
       await expect(page.getByTestId('measure-counts')).toHaveText('2 improved');
+      // The body maps draw (QA 2026-11-21: they were 0 px wide, only the key showed), and on a phone follow the two picked.
+      const maps = page.getByTestId('compare-maps');
+      await expect(maps.locator('section')).toHaveCount(2);
+      for (const svg of await maps.locator('svg[data-view]').all()) {
+        const box = await svg.boundingBox();
+        expect(box?.width ?? 0).toBeGreaterThan(50);
+        expect(box?.height ?? 0).toBeGreaterThan(50);
+      }
       if (phone) {
         const findings = page.getByRole('list', { name: 'Findings' });
         await expect(findings.getByRole('listitem').filter({ hasText: 'Knees cave in · L' })).toContainText(/Severe →.*Slight/);
@@ -279,6 +301,9 @@ for (const { size, use } of SIZES) {
       await expect(again.getByRole('textbox', { name: 'Template name' })).toHaveValue(renamed);
       await again.getByRole('button', { name: /^Delete/ }).click();
       await expect(again.getByTestId('delete-confirm')).toContainText(`Delete “${renamed}”?`);
+      // On the phone the confirm sits in the sticky footer: on screen without scrolling (QA 2026-11-21).
+      await expect(again.getByRole('button', { name: 'Delete template' })).toBeInViewport();
+      await shot(page, `${size}-template-delete-confirm`);
       await again.getByRole('button', { name: 'Delete template' }).click();
       await expect(page.getByRole('button', { name: `${renamed} 2 tests`, exact: true })).toHaveCount(0);
     });

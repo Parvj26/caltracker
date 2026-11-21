@@ -1,16 +1,19 @@
+import { checkpointLabelMap } from './findings';
 import { checkpointsOf, movementScore, type NotScored } from './score';
 import type { AssessmentSlot, CheckpointResult, MeasureDef, Severity, Side, TestDefinition, TestStatus } from './types';
 
 /**
  * Compare (board AS7): two or three finished assessments of a cycle side by side (Initial → Retest 1 → Retest 2).
  *
- * - Movement score: overall and per test, with the change from the first column to the last.
+ * - Movement score: overall and per test, with the change from the first column to the last. The overall change is
+ *   like-for-like: when the two ends scored different tests, it is worked out again over only the tests scored in
+ *   both (`sameTests`), so adding or skipping a test never reads as progress.
  * - Findings: every checkpoint the coach rated Slight or Severe in any column, joined on (checkpoint id, side). Ids are
  *   stable across library versions, so a retest run on a newer version still lines up. The change (first → last):
  *   Improved (less far), Same, New (Normal before), Worse (Slight → Severe), or Not tested when either end has no
  *   rating (test skipped, not in that assessment, or a checkpoint the older version didn't have).
  * - Measurements: each (measure id, side) with the change, read as better or worse with the unit and the
- *   higher-is-better stored with the number.
+ *   higher-is-better stored with the number. A number from a stopped test is shown but never read as a change.
  *
  * A line whose two sides read the same in every column shows once as "· L R" (the boards' "Heels lift · L R").
  * Counts (improved / same / new / worse) count the lines shown; Not tested lines are left out of them.
@@ -38,11 +41,12 @@ export type CompareAssessment = {
 /** A checkpoint in one column: its rating, or not tested. */
 export type CompareValue = Severity | 'not_tested';
 export type FindingChange = 'improved' | 'same' | 'new' | 'worse' | 'not_tested';
-export type MeasureChange = 'improved' | 'same' | 'worse' | 'not_tested';
+/** `stopped`: either end comes from a stopped test, so the numbers aren't compared. */
+export type MeasureChange = 'improved' | 'same' | 'worse' | 'not_tested' | 'stopped';
 
 export type CompareFindingRow = {
   checkpointId: string;
-  /** "Knees cave in", "Head forward · posture". */
+  /** "Heels lift", "Head forward · posture", or "Knees cave in · Overhead squat" when two tests have the same words. */
   label: string;
   /** 'L', 'R', 'LR' (both sides read the same everywhere) or 'none' (an unsided checkpoint). */
   side: Side | 'LR';
@@ -76,7 +80,12 @@ export type CompareTestScoreRow = {
 };
 
 export type Comparison = {
-  overall: { values: (number | null)[]; delta: number | null };
+  /**
+   * `values`: each column's full score. `delta`: last minus first, like-for-like. `sameTests`: both ends worked out
+   * over only the tests scored in both, when the two ends scored different tests (null when they scored the same ones,
+   * or share none).
+   */
+  overall: { values: (number | null)[]; delta: number | null; sameTests: { from: number; to: number } | null };
   tests: CompareTestScoreRow[];
   findings: CompareFindingRow[];
   findingCounts: Record<'improved' | 'same' | 'new' | 'worse', number>;
@@ -144,6 +153,31 @@ function valueIn(a: CompareAssessment, checkpointId: string, side: Side): Compar
   return 'not_tested';
 }
 
+const scoreInputs = (a: CompareAssessment) => a.tests.map((t) => ({ definition: t.definition, status: t.status, results: t.results }));
+
+/** The keys of the tests that got a score in an assessment, sorted. */
+function scoredKeys(a: CompareAssessment | undefined): string[] {
+  if (!a) return [];
+  return movementScore(scoreInputs(a)).tests.flatMap((t) => (t.score !== null ? [t.key] : [])).sort();
+}
+
+/**
+ * Both ends worked out over only the tests scored in both; null when they scored the same tests (the full scores are
+ * already like-for-like) or share none.
+ */
+function likeForLike([first, last]: [CompareAssessment | undefined, CompareAssessment | undefined]): { from: number; to: number } | null {
+  if (!first || !last) return null;
+  const a = scoredKeys(first);
+  const b = scoredKeys(last);
+  if (a.join() === b.join()) return null;
+  const both = new Set(a.filter((k) => b.includes(k)));
+  if (both.size === 0) return null;
+  const over = (x: CompareAssessment) => movementScore(scoreInputs(x).filter((t) => both.has(t.definition.key))).overall;
+  const from = over(first);
+  const to = over(last);
+  return from !== null && to !== null ? { from, to } : null;
+}
+
 export function compareAssessments(columns: readonly CompareAssessment[]): Comparison {
   const last = columns.length - 1;
   const firstLast = <T>(values: T[]): [T, T] => [values[0] as T, values[last] as T];
@@ -152,6 +186,7 @@ export function compareAssessments(columns: readonly CompareAssessment[]): Compa
   const scored = columns.map((a) => movementScore(a.tests.map((t) => ({ definition: t.definition, status: t.status, results: t.results }))));
   const overallValues = columns.map((a, i) => a.score ?? scored[i]?.overall ?? null);
   const [o1, o2] = firstLast(overallValues);
+  const sameTests = likeForLike(firstLast([...columns]));
   const testKeys: { key: string; name: string; recordOnly: boolean }[] = [];
   for (const a of columns) {
     for (const t of a.tests) {
@@ -178,15 +213,16 @@ export function compareAssessments(columns: readonly CompareAssessment[]): Compa
   const lines = new Map<string, Line>();
   let order = 0;
   // Labels come from the newest column that has the checkpoint (its wording wins); order from the first time seen.
-  for (const a of [...columns].reverse()) {
+  const newestFirst = [...columns].reverse();
+  const labels = checkpointLabelMap(newestFirst.flatMap((a) => a.tests.map((t) => t.definition)));
+  for (const a of newestFirst) {
     for (const t of a.tests) {
       for (const c of checkpointsOf(t.definition)) {
         for (const side of c.sided ? (['L', 'R'] as const) : (['none'] as const)) {
           const k = `${c.id}|${side}`;
           if (lines.has(k)) continue;
           const recordOnly = t.definition.kind === 'record_only';
-          const base = c.finding ?? c.label;
-          lines.set(k, { checkpointId: c.id, side, label: recordOnly ? `${base} · posture` : base, recordOnly, order: 0 });
+          lines.set(k, { checkpointId: c.id, side, label: labels[c.id] ?? c.label, recordOnly, order: 0 });
         }
       }
     }
@@ -260,17 +296,21 @@ export function compareAssessments(columns: readonly CompareAssessment[]): Compa
       for (const t of a.tests) {
         if (t.status === 'skipped' || t.status === 'pending') continue;
         const v = t.measures.find((x) => x.measureId === line.measureId && x.side === line.side);
-        if (v) return v;
+        if (v) return { ...v, stopped: t.status === 'stopped' };
       }
       return null;
     });
     if (found.every((v) => v === null)) continue;
     const [f1, f2] = firstLast(found);
+    const stopped = f1?.stopped === true || f2?.stopped === true;
     // The unit and direction stored with the numbers; a change of unit between versions can't be compared.
     const unit = f2?.unit ?? f1?.unit ?? line.unit;
     const higherIsBetter = f2?.higherIsBetter ?? f1?.higherIsBetter ?? line.higherIsBetter;
     const comparable = f1 !== null && f2 !== null && f1.unit === f2.unit && f1.higherIsBetter === f2.higherIsBetter;
-    const { delta, change } = comparable ? measureChange(f1.value, f2.value, higherIsBetter) : { delta: null, change: 'not_tested' as const };
+    const { delta, change }: { delta: number | null; change: MeasureChange } =
+      comparable && stopped ? { delta: null, change: 'stopped' }
+      : comparable ? measureChange(f1.value, f2.value, higherIsBetter)
+      : { delta: null, change: 'not_tested' };
     measures.push({
       measureId: line.measureId,
       label: line.label,
@@ -283,10 +323,11 @@ export function compareAssessments(columns: readonly CompareAssessment[]): Compa
     });
   }
   const measureCounts = { improved: 0, same: 0, worse: 0 };
-  for (const m of measures) if (m.change !== 'not_tested') measureCounts[m.change] += 1;
+  for (const m of measures) if (m.change !== 'not_tested' && m.change !== 'stopped') measureCounts[m.change] += 1;
 
+  const delta = sameTests ? sameTests.to - sameTests.from : o1 !== null && o2 !== null && scoredKeys(columns[0]).join() === scoredKeys(columns[last]).join() ? o2 - o1 : null;
   return {
-    overall: { values: overallValues, delta: o1 !== null && o2 !== null ? o2 - o1 : null },
+    overall: { values: overallValues, delta, sameTests },
     tests,
     findings,
     findingCounts,
