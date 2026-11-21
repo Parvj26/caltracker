@@ -1,5 +1,5 @@
 begin;
-select plan(54);
+select plan(55);
 
 -- Account deletion (Apple requires it in the app). The delete-account Edge Function removes the client's files
 -- through the Storage API, then deletes the auth user; this file proves the database half: deleting the auth user
@@ -22,6 +22,8 @@ select is(
   ) x),
   array[
     'admin_users(created_by)>auth.users:n', 'admin_users(user_id)>auth.users:c',
+    'assessment_cycles(client_id)>auth.users:c', 'assessment_cycles(created_by)>auth.users:n',
+    'assessments(client_id)>auth.users:c', 'assessments(coach_id)>auth.users:n',
     'award_bonus_queue(client_id)>auth.users:c', 'awards(client_id)>auth.users:c',
     'body_measurements(client_id)>auth.users:c', 'body_measurements(entered_by)>auth.users:n',
     'body_metrics(client_id)>auth.users:c', 'body_metrics(entered_by)>auth.users:n',
@@ -181,6 +183,19 @@ values (:'ws', :'vic', 'InBody', :'ws' || '/' || :'vic' || '/' || :'doc_file' ||
 insert into public.client_goals (workspace_id, client_id, goal) values (:'ws', :'vic', 'Run 5k');
 insert into public.client_limitations (workspace_id, client_id, body) values (:'ws', :'vic', 'Knee');
 insert into public.client_notes (workspace_id, client_id, body, created_by) values (:'ws', :'vic', 'Note', :'coach');
+
+-- A movement assessment with a rating and a number.
+insert into public.assessment_cycles (workspace_id, client_id, number, created_by) values (:'ws', :'vic', 1, :'coach')
+returning id as vic_cycle \gset
+insert into public.assessments (workspace_id, client_id, cycle_id, slot, assessed_on, coach_id)
+values (:'ws', :'vic', :'vic_cycle', 'initial', current_date, :'coach') returning id as vic_assessment \gset
+insert into public.assessment_tests (workspace_id, assessment_id, position, definition_id)
+values (:'ws', :'vic_assessment', 0, (select id from public.assessment_test_definitions where test_key = 'shoulder_mobility'))
+returning id as vic_test \gset
+insert into public.assessment_checkpoint_results (test_id, workspace_id, checkpoint_id, side, severity)
+values (:'vic_test', :'ws', 'shm.shoulder_hike', 'L', 'slight');
+insert into public.assessment_measure_results (test_id, workspace_id, measure_id, side, value, unit, higher_is_better)
+values (:'vic_test', :'ws', 'shm.reach_gap', 'L', 14, 'cm', false);
 
 -- Food: a meal from the coach's list, a photo meal, and targets.
 insert into public.meals (workspace_id, client_id, eaten_on, name, calories, coach_meal_id)
@@ -342,6 +357,10 @@ select is((select count(*)::int from public.workouts where id = :'vic_workout'),
 select is((select count(*)::int from public.meals where coach_meal_id = :'coach_meal'), 0,
   'Vic''s meal from the coach''s list is gone');
 select is((select count(*)::int from public.client_notes where body = 'Note'), 0, 'the coach''s notes about Vic are gone');
+select is((select count(*)::int from public.assessment_tests where id = :'vic_test')
+  + (select count(*)::int from public.assessment_checkpoint_results where test_id = :'vic_test')
+  + (select count(*)::int from public.assessment_measure_results where test_id = :'vic_test'), 0,
+  'Vic''s assessment tests, ratings and numbers are gone');
 select is((select count(*)::int from auth.identities where user_id = :'vic'), 0, 'Vic''s sign-in identity is gone');
 
 -- ---------- Everyone else is untouched ----------

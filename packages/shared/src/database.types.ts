@@ -106,6 +106,296 @@ export type Database = {
         }
         Relationships: []
       }
+      assessment_checkpoint_results: {
+        Row: {
+          checkpoint_id: string
+          severity: string
+          side: string
+          test_id: string
+          workspace_id: string
+        }
+        Insert: {
+          checkpoint_id: string
+          severity: string
+          side: string
+          test_id: string
+          workspace_id: string
+        }
+        Update: {
+          checkpoint_id?: string
+          severity?: string
+          side?: string
+          test_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_checkpoint_results_test_id_workspace_id_fkey"
+            columns: ["test_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_tests"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      assessment_cycles: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          number: number
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          number: number
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          number?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_cycles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_measure_results: {
+        Row: {
+          higher_is_better: boolean
+          measure_id: string
+          side: string
+          test_id: string
+          unit: string
+          value: number
+          workspace_id: string
+        }
+        Insert: {
+          higher_is_better: boolean
+          measure_id: string
+          side: string
+          test_id: string
+          unit: string
+          value: number
+          workspace_id: string
+        }
+        Update: {
+          higher_is_better?: boolean
+          measure_id?: string
+          side?: string
+          test_id?: string
+          unit?: string
+          value?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_measure_results_test_id_workspace_id_fkey"
+            columns: ["test_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_tests"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      assessment_test_definitions: {
+        Row: {
+          created_at: string
+          definition: Json
+          id: string
+          kind: string
+          name: string
+          retired_at: string | null
+          test_key: string
+          version: number
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          definition: Json
+          id?: string
+          kind: string
+          name: string
+          retired_at?: string | null
+          test_key: string
+          version: number
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          definition?: Json
+          id?: string
+          kind?: string
+          name?: string
+          retired_at?: string | null
+          test_key?: string
+          version?: number
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_test_definitions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_tests: {
+        Row: {
+          assessment_id: string
+          definition: Json
+          definition_id: string | null
+          definition_version: number
+          discomfort_left: boolean
+          discomfort_right: boolean
+          follow_ups: Json
+          id: string
+          note: string
+          position: number
+          score: number | null
+          status: string
+          test_key: string
+          type_done: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assessment_id: string
+          definition: Json
+          definition_id?: string | null
+          definition_version: number
+          discomfort_left?: boolean
+          discomfort_right?: boolean
+          follow_ups?: Json
+          id?: string
+          note?: string
+          position: number
+          score?: number | null
+          status?: string
+          test_key: string
+          type_done?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assessment_id?: string
+          definition?: Json
+          definition_id?: string | null
+          definition_version?: number
+          discomfort_left?: boolean
+          discomfort_right?: boolean
+          follow_ups?: Json
+          id?: string
+          note?: string
+          position?: number
+          score?: number | null
+          status?: string
+          test_key?: string
+          type_done?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_tests_assessment_id_workspace_id_fkey"
+            columns: ["assessment_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "assessment_tests_definition_id_fkey"
+            columns: ["definition_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_test_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessments: {
+        Row: {
+          assessed_on: string
+          client_id: string
+          coach_id: string | null
+          created_at: string
+          cycle_id: string
+          finished_at: string | null
+          foot_arch_left: string | null
+          foot_arch_right: string | null
+          id: string
+          note: string
+          score: number | null
+          slot: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assessed_on: string
+          client_id: string
+          coach_id?: string | null
+          created_at?: string
+          cycle_id: string
+          finished_at?: string | null
+          foot_arch_left?: string | null
+          foot_arch_right?: string | null
+          id?: string
+          note?: string
+          score?: number | null
+          slot: string
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assessed_on?: string
+          client_id?: string
+          coach_id?: string | null
+          created_at?: string
+          cycle_id?: string
+          finished_at?: string | null
+          foot_arch_left?: string | null
+          foot_arch_right?: string | null
+          id?: string
+          note?: string
+          score?: number | null
+          slot?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessments_cycle_id_workspace_id_client_id_fkey"
+            columns: ["cycle_id", "workspace_id", "client_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_cycles"
+            referencedColumns: ["id", "workspace_id", "client_id"]
+          },
+          {
+            foreignKeyName: "assessments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       award_bonus_queue: {
         Row: {
           client_id: string
@@ -3138,6 +3428,7 @@ export type Database = {
       }
       admin_view_as_snapshot: { Args: { p_user_id: string }; Returns: Json }
       apply_award: { Args: { p_log_id: string; p_result: Json }; Returns: Json }
+      assessment_write_allowed: { Args: never; Returns: boolean }
       assign_program: {
         Args: {
           p_assignment_id: string
@@ -3334,6 +3625,10 @@ export type Database = {
         Returns: string
       }
       exercise_usable_in: { Args: { ex: string; ws: string }; Returns: boolean }
+      finish_assessment: {
+        Args: { p_assessment_id: string; p_overall: number; p_scores: Json }
+        Returns: undefined
+      }
       finish_push_batch: {
         Args: { p_dead_tokens: string[]; p_results: Json }
         Returns: undefined
@@ -3548,6 +3843,21 @@ export type Database = {
         Args: { p_community_id: string; p_user_id: string }
         Returns: undefined
       }
+      save_assessment_test: {
+        Args: {
+          p_discomfort_left: boolean
+          p_discomfort_right: boolean
+          p_follow_ups: Json
+          p_measures: Json
+          p_note: string
+          p_results: Json
+          p_score: number
+          p_status: string
+          p_test_id: string
+          p_type_done: string
+        }
+        Returns: undefined
+      }
       save_body_measurement: { Args: { p: Json }; Returns: string }
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
@@ -3600,6 +3910,20 @@ export type Database = {
       }
       shares_workspace_with: { Args: { other: string }; Returns: boolean }
       split_full_name: { Args: { name: string }; Returns: string[] }
+      start_assessment: {
+        Args: {
+          p_assessed_on: string
+          p_client_id: string
+          p_foot_arch_left: string
+          p_foot_arch_right: string
+          p_new_cycle: boolean
+          p_note: string
+          p_slot: string
+          p_test_keys: string[]
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       storage_objects_for_user: {
         Args: { p_user: string }
         Returns: {

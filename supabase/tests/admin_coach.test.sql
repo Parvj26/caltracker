@@ -18,6 +18,8 @@ select is(
    join pg_tables t on t.schemaname = 'public' and t.tablename = c.table_name
    where c.table_schema = 'public' and c.column_name = 'workspace_id'),
   array[
+    'assessment_checkpoint_results', 'assessment_cycles', 'assessment_measure_results', 'assessment_test_definitions',
+    'assessment_tests', 'assessments',
     'award_bonus_queue', 'awards', 'body_measurements', 'body_metrics', 'client_documents', 'client_goals', 'client_invite_plan_items', 'client_invites',
     'client_limitations', 'client_notes', 'client_stats', 'coach_meals', 'communities', 'community_blocks',
     'community_comments', 'community_members', 'community_notifications', 'community_post_images', 'community_posts',
@@ -47,7 +49,8 @@ select is(
        select 1 from pg_constraint k join pg_attribute a on a.attrelid = k.conrelid and a.attnum = any(k.conkey)
        where k.contype = 'f' and k.conrelid = to_regclass('public.' || quote_ident(c.table_name))
          and a.attname = 'workspace_id' and k.confrelid = 'public.workspaces'::regclass)),
-  array['community_members', 'community_post_images', 'community_posts', 'log_blocks', 'log_exercises', 'log_sets',
+  array['assessment_checkpoint_results', 'assessment_measure_results', 'assessment_tests',
+        'community_members', 'community_post_images', 'community_posts', 'log_blocks', 'log_exercises', 'log_sets',
         'program_workouts', 'workout_blocks', 'workout_exercises', 'workout_log_comments', 'workout_sets',
         'workout_substitutes']::text[] collate "C",
   'workspace_id columns without their own key to workspaces are on the reviewed list');

@@ -253,7 +253,7 @@ test('the tabs open Training, Metrics and Documents, ⋯ opens Settings, and old
   await expect(page.getByRole('heading', { name: 'Add a document' })).toBeVisible();
 
   // Settings is no longer a tab: it is in the bar's ⋯, at its old address.
-  await expect(tabs.getByRole('link')).toHaveText(['Overview', 'Training', 'Metrics', 'Food', 'Documents']);
+  await expect(tabs.getByRole('link')).toHaveText(['Overview', 'Training', 'Metrics', 'Limitations & injuries', 'Food', 'Documents']);
   await page.getByRole('button', { name: 'More for this client' }).click();
   await page.getByRole('menuitem', { name: 'Client settings' }).click();
   await expect(page).toHaveURL(new RegExp(`/clients/${s.clientId}/settings$`));
