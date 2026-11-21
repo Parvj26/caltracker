@@ -131,6 +131,7 @@ function TemplateEditor({
   const [pending, setPending] = useState<'save' | 'delete' | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
   const [saved, setSaved] = useState(false);
+  const confirmRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!saved) return;
@@ -222,17 +223,25 @@ function TemplateEditor({
     }
   }
 
+  // In the phone's full-screen editor the confirm's buttons go in the sticky footer (in place of Cancel / Save), so
+  // "Delete template" is always on screen; the question itself scrolls into view.
+  useEffect(() => {
+    if (confirmDelete && mode === 'dialog') confirmRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [confirmDelete, mode]);
+  const confirmActions = (
+    <>
+      <Button variant="secondary" onClick={() => setConfirmDelete(false)} disabled={pending !== null} phSafe>Cancel</Button>
+      <Button variant="danger" onClick={() => void remove()} pending={pending === 'delete'} phSafe>
+        {pending === 'delete' ? 'Deleting…' : 'Delete template'}
+      </Button>
+    </>
+  );
   const deleteConfirm = confirmDelete && template ? (
-    <div className={styles.confirm} data-testid="delete-confirm">
+    <div ref={confirmRef} className={styles.confirm} data-testid="delete-confirm">
       <p className={styles.confirmText}>
         <strong>Delete “{template.name}”?</strong> Assessments already started from it keep their tests. This can’t be undone.
       </p>
-      <div className={styles.confirmActions}>
-        <Button variant="secondary" onClick={() => setConfirmDelete(false)} disabled={pending !== null} phSafe>Cancel</Button>
-        <Button variant="danger" onClick={() => void remove()} pending={pending === 'delete'} phSafe>
-          {pending === 'delete' ? 'Deleting…' : 'Delete template'}
-        </Button>
-      </div>
+      {mode === 'dialog' ? null : <div className={styles.confirmActions}>{confirmActions}</div>}
     </div>
   ) : null;
 
@@ -362,10 +371,14 @@ function TemplateEditor({
         fullScreenOnPhone
         noKeyboardOnTouch
         footer={
-          <>
-            <Button variant="secondary" onClick={() => dialogRef.current?.requestClose()} disabled={pending !== null} phSafe>Cancel</Button>
-            {saveButton}
-          </>
+          deleteConfirm ? (
+            confirmActions
+          ) : (
+            <>
+              <Button variant="secondary" onClick={() => dialogRef.current?.requestClose()} disabled={pending !== null} phSafe>Cancel</Button>
+              {saveButton}
+            </>
+          )
         }
       >
         {body}

@@ -97,7 +97,10 @@ for (const { size, use } of SIZES) {
       await expect(dialog.getByRole('list', { name: 'Picked muscle groups' })).toContainText('Glute medius');
       await dialog.getByRole('button', { name: 'Right side' }).click();
       await dialog.getByLabel('Sets').fill('2');
-      await dialog.getByLabel('Reps (optional)').fill('5');
+      // A dose needs reps or seconds: "2 sets" alone can't be saved.
+      await expect(dialog.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
+      await expect(dialog.getByRole('button', { name: 'Save' })).toHaveAccessibleDescription('Add reps');
+      await dialog.getByLabel('Reps', { exact: true }).fill('5');
       await dialog.getByRole('checkbox', { name: 'Each side' }).check();
       await shot(page, `${size}-2-new-corrective`);
       await audit(page, size, 'dialog[open]');
@@ -142,7 +145,7 @@ for (const { size, use } of SIZES) {
       }
       const edit = page.getByRole('dialog', { name: 'Edit corrective exercise' });
       await expect(edit.getByText(name)).toBeVisible();
-      await edit.getByLabel('Reps (optional)').fill('8');
+      await edit.getByLabel('Reps', { exact: true }).fill('8');
       await edit.getByRole('button', { name: 'Save' }).click();
       await expect(edit).toBeHidden({ timeout: 20_000 });
       await expect(glute.getByRole('button', { name: new RegExp(`^${name} Yours 2 × 8 each side`) })).toBeVisible();

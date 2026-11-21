@@ -73,6 +73,8 @@ export type AssessmentTest = {
   definition: TestDefinition;
   entry: TestEntry;
   score: number | null;
+  /** Bumped by every save; a save sends the one it loaded so a stale screen can't write over newer marks. */
+  revision: number;
   /** The numbers with the unit and direction stored beside them (Compare reads changes with these). */
   measures: CompareMeasure[];
 };
@@ -101,7 +103,7 @@ export async function loadAssessment(supabase: Supabase, workspaceId: string, cl
     .select(
       `id, client_id, slot, status, assessed_on, foot_arch_left, foot_arch_right, note, score, coach_id, cycle_id,
        assessment_cycles (number),
-       assessment_tests (id, position, test_key, definition, status, discomfort_left, discomfort_right, type_done, note, follow_ups, score,
+       assessment_tests (id, position, test_key, definition, status, discomfort_left, discomfort_right, type_done, note, follow_ups, score, revision,
          assessment_checkpoint_results (checkpoint_id, side, severity),
          assessment_measure_results (measure_id, side, value, unit, higher_is_better))`,
     )
@@ -118,6 +120,7 @@ export async function loadAssessment(supabase: Supabase, workspaceId: string, cl
       key: t.test_key,
       definition: t.definition as unknown as TestDefinition,
       score: t.score,
+      revision: t.revision,
       measures: t.assessment_measure_results.map(
         (m): CompareMeasure => ({
           measureId: m.measure_id,

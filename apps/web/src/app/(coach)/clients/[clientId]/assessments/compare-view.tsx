@@ -22,6 +22,7 @@ import { Button, Card, PageHeader } from '@/components/ui';
 import { useLocalToday } from '@/lib/local-today';
 import { useMediaQuery } from '@/lib/use-media-query';
 import type { AssessmentDetail, AssessmentTemplate, LibraryTest } from './load';
+import { CompareColumnsContext } from './compare-columns';
 import { StartDialog } from './start-dialog';
 import styles from './assessments.module.css';
 
@@ -38,6 +39,7 @@ const CHANGE_WORD: Record<FindingChange | MeasureChange, string> = {
   new: 'New',
   worse: 'Worse',
   not_tested: 'Not tested',
+  stopped: 'Stopped',
 };
 const NOTHING_SEEN = 'Nothing seen in either: every checkpoint was Normal.';
 const SIDE_TEXT = { L: ' · L', R: ' · R', LR: ' · L R', none: '' } as const;
@@ -146,6 +148,12 @@ export function CompareView({
                 </span>
               ) : null}
             </p>
+            {c.overall.sameTests ? (
+              // The change above is like-for-like: only the tests scored at both ends.
+              <p className={styles.caption} data-testid="compare-same-tests">
+                Same tests: {c.overall.sameTests.from} → {c.overall.sameTests.to}
+              </p>
+            ) : null}
             {o1 !== null && o2 !== null ? (
               <p className={styles.bandLine} data-ph-safe="">
                 <span className={styles.band} data-band={scoreBand(o1).id}>{scoreBand(o1).label}</span>
@@ -178,7 +186,7 @@ export function CompareView({
         </div>
       </Card>
 
-      {slots.bodyMaps}
+      <CompareColumnsContext.Provider value={shown.map((a) => a.id)}>{slots.bodyMaps}</CompareColumnsContext.Provider>
 
       {phone ? (
         <>
@@ -345,14 +353,15 @@ function ColumnPicker({
 
 function ChangeChip({ change }: { change: FindingChange | MeasureChange }) {
   return (
-    <span className={styles.changeChip} data-change={change}>
+    // A stopped test's numbers look like "Not tested" (grey): shown, never counted.
+    <span className={styles.changeChip} data-change={change === 'stopped' ? 'not_tested' : change}>
       {CHANGE_WORD[change]}
     </span>
   );
 }
 
 function MeasureDelta({ row }: { row: CompareMeasureRow }) {
-  if (row.delta === null) return <ChangeChip change="not_tested" />;
+  if (row.delta === null) return <ChangeChip change={row.change === 'stopped' ? 'stopped' : 'not_tested'} />;
   return (
     <span className={styles.changeChip} data-change={row.change}>
       {formatMeasureDelta(row.delta, row.unit)}

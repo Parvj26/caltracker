@@ -1,5 +1,5 @@
 begin;
-select plan(74);
+select plan(77);
 
 -- Fixtures (as postgres): workspace A with clients a1 and a2, workspace B with client b1.
 select tests.create_user('as-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -91,6 +91,14 @@ select is((select string_agg(side || '=' || value::text || unit || '/' || higher
 select throws_ok(format($$select public.save_assessment_test(%L, 'done', '[]',
     '[{"measure_id":"shm.reach_gap","side":"L","value":61}]', '{}', false, false, '', '', null)$$, :'shm_a1'),
   '22023', null, 'a number outside the measure''s range is refused');
+-- Stale screens (20261121004000): a save sends the revision it loaded; a newer save in between makes it refuse.
+select revision as ohs_rev from public.assessment_tests where id = :'ohs_a1' \gset
+select is((select public.save_assessment_test(:'ohs_a1', 'done', '[{"checkpoint_id":"ohs.knee_valgus","side":"L","severity":"severe"}]',
+    '[]', '{}', false, false, '', '', 75::smallint, :ohs_rev)), :ohs_rev + 1, 'a save with the current revision returns the next one');
+select throws_ok(format($$select public.save_assessment_test(%L, 'done', '[]', '[]', '{}', false, false, '', '', 100::smallint, %s)$$,
+    :'ohs_a1', :ohs_rev), 'PT409', null, 'a save from a screen opened before the last save is refused');
+select is((select string_agg(severity, ',') from public.assessment_checkpoint_results where test_id = :'ohs_a1'), 'severe',
+  'the newer marks are kept');
 -- Straight to the tables (the REST API), the same writes are refused: only the functions, which check them, may.
 select throws_ok(format($$insert into public.assessment_checkpoint_results (test_id, workspace_id, checkpoint_id, side, severity)
   values (%L, %L, 'ohs.nope', 'L', 'severe')$$, :'ohs_a1', :'ws_a'), '42501', null, 'the coach cannot add a rating directly');

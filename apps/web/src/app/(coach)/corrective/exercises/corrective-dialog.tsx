@@ -180,7 +180,8 @@ export function CorrectiveDialog({
     exerciseReason ??
     (muscles.length === 0 ? 'Pick at least one muscle group'
     : !Number.isInteger(setsN) || setsN < 1 || setsN > DOSE_LIMITS.sets ? `Sets: 1 to ${DOSE_LIMITS.sets}`
-    : amountN !== null && (!Number.isInteger(amountN) || amountN < 1 || amountN > max) ? `${kind === 'reps' ? 'Reps' : 'Seconds'}: 1 to ${max}`
+    : amountN === null ? `Add ${kind === 'reps' ? 'reps' : 'seconds'}`
+    : !Number.isInteger(amountN) || amountN < 1 || amountN > max ? `${kind === 'reps' ? 'Reps' : 'Seconds'}: 1 to ${max}`
     : null);
 
   async function save() {
@@ -525,7 +526,7 @@ export function CorrectiveDialog({
                 </div>
               </div>
               <TextField
-                label={kind === 'reps' ? 'Reps (optional)' : 'Seconds (optional)'}
+                label={kind === 'reps' ? 'Reps' : 'Seconds'}
                 type="number"
                 inputMode="numeric"
                 min={1}

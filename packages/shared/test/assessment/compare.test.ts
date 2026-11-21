@@ -70,7 +70,7 @@ describe('compareAssessments: the board example (AS7 / AS12)', () => {
   const c = compareAssessments([initial, retest]);
 
   it('works the scores out the same way as movementScore: 68 → 85, +17', () => {
-    expect(c.overall).toEqual({ values: [68, 85], delta: 17 });
+    expect(c.overall).toEqual({ values: [68, 85], delta: 17, sameTests: null });
     expect(c.tests.map((t) => [t.name, t.cells.map((x) => x.score), t.delta])).toEqual([
       ['Overhead squat', [67, 83], 16],
       ['Shoulder mobility', [75, 100], 25],
@@ -102,7 +102,7 @@ describe('compareAssessments: the board example (AS7 / AS12)', () => {
   });
 
   it('prefers the stored overall score', () => {
-    expect(compareAssessments([{ ...initial, score: 70 }, retest]).overall).toEqual({ values: [70, 85], delta: 15 });
+    expect(compareAssessments([{ ...initial, score: 70 }, retest]).overall).toEqual({ values: [70, 85], delta: 15, sameTests: null });
   });
 });
 
@@ -179,7 +179,55 @@ describe('compareAssessments: edge cases', () => {
     const b = assessment('retest_1', [test('overhead_squat')]);
     const c = compareAssessments([a, b]);
     expect(c.findings).toEqual([]);
-    expect(c.overall).toEqual({ values: [100, 100], delta: 0 });
+    expect(c.overall).toEqual({ values: [100, 100], delta: 0, sameTests: null });
+  });
+});
+
+describe('compareAssessments: like-for-like overall change', () => {
+  // Initial: overhead squat 67, shoulder mobility skipped. Retest: overhead squat 83, shoulder mobility 100.
+  const a = assessment('initial', [initial.tests[0]!, test('shoulder_mobility', [], [], 'skipped')]);
+  const b = assessment('retest_1', [retest.tests[0]!, retest.tests[1]!]);
+
+  it('works both ends out over only the tests scored in both', () => {
+    const c = compareAssessments([a, b]);
+    // The full scores stay per column (67 → 85); the change is the overhead squat alone: 67 → 83, +16 (not +18).
+    expect(c.overall).toEqual({ values: [67, 85], delta: 16, sameTests: { from: 67, to: 83 } });
+  });
+
+  it('a stored score per column does not change the like-for-like change', () => {
+    expect(compareAssessments([{ ...a, score: 67 }, { ...b, score: 85 }]).overall.delta).toBe(16);
+  });
+
+  it('no change when the two ends share no scored test', () => {
+    const only = assessment('retest_1', [test('shoulder_mobility')]);
+    const c = compareAssessments([a, only]);
+    expect(c.overall).toEqual({ values: [67, 100], delta: null, sameTests: null });
+  });
+
+  it('a stopped test counts in neither end', () => {
+    const stopped = assessment('initial', [initial.tests[0]!, test('shoulder_mobility', [r('shm.shoulder_hike', 'L', 'severe')], [], 'stopped')]);
+    expect(compareAssessments([stopped, b]).overall.sameTests).toEqual({ from: 67, to: 83 });
+  });
+});
+
+describe('compareAssessments: measurements of a stopped test', () => {
+  it('shows the numbers but never reads them as improved', () => {
+    const a = assessment('initial', [test('active_straight_leg_raise', [], [m('aslr.angle', 'L', 60, 'deg', true)], 'stopped')]);
+    const b = assessment('retest_1', [test('active_straight_leg_raise', [], [m('aslr.angle', 'L', 70, 'deg', true), m('aslr.angle', 'R', 75, 'deg', true)])]);
+    const c = compareAssessments([a, b]);
+    expect(c.measures.map((x) => [x.side, x.values, x.delta, x.change])).toEqual([
+      ['L', [60, 70], null, 'stopped'],
+      ['R', [null, 75], null, 'not_tested'],
+    ]);
+    expect(c.measureCounts).toEqual({ improved: 0, same: 0, worse: 0 });
+  });
+});
+
+describe('compareAssessments: same-sounding findings of two tests', () => {
+  it('names the test: "Knees cave in · Overhead squat", "Knee caves in · Single-leg squat"', () => {
+    const a = assessment('initial', [test('overhead_squat', [r('ohs.knee_valgus', 'L', 'slight')]), test('single_leg_squat', [r('sls.knee_valgus', 'L', 'severe')])]);
+    const b = assessment('retest_1', [test('overhead_squat'), test('single_leg_squat', [r('sls.knee_valgus', 'L', 'slight')])]);
+    expect(compareAssessments([a, b]).findings.map((f) => f.label)).toEqual(['Knees cave in · Overhead squat', 'Knee caves in · Single-leg squat']);
   });
 });
 
@@ -192,7 +240,7 @@ describe('orderColumnPicks (phone: two boxes)', () => {
     const r2 = assessment('retest_2', [...retest.tests]);
     const cols = [initial, retest, r2];
     const [a, b] = orderColumnPicks([2, 0]);
-    expect(compareAssessments([cols[a]!, cols[b]!]).overall).toEqual({ values: [68, 85], delta: 17 });
+    expect(compareAssessments([cols[a]!, cols[b]!]).overall).toEqual({ values: [68, 85], delta: 17, sameTests: null });
   });
 });
 

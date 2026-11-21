@@ -568,6 +568,11 @@
 }
 .sheetLibraryToggle input { width: 22px; height: 22px; margin: 0; accent-color: var(--ct-ink); }
 .sheetDiscard { margin: 0; }
+/* One line in the sheet's header: a long client name ends in "…" rather than pushing the title down. */
+.sheetEyebrow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 599.98px) {
+  .sheetWideOnly { display: none; }
+}
 .sheetNote { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .sheetBody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 599.98px) {

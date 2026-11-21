@@ -165,6 +165,9 @@ describe('input checks', () => {
     expect(checkCorrectiveTags({ ...good, muscles: [] })).toBeNull();
     expect(checkCorrectiveTags({ ...good, muscles: [{ muscleId: 'abs', side: 'L' }] })).toBeNull();
     expect(checkCorrectiveTags({ ...good, dose: { ...good.dose, seconds: 30 } })).toBeNull();
+    // Reps or seconds is required: "2 sets" alone is not a dose.
+    expect(checkCorrectiveTags({ ...good, dose: { ...good.dose, reps: null, seconds: null } })).toBeNull();
+    expect(checkCorrectiveTags({ ...good, dose: { ...good.dose, reps: null, seconds: 30 } })?.dose.seconds).toBe(30);
     expect(checkCorrectiveTags({ ...good, dose: { ...good.dose, sets: 0 } })).toBeNull();
     expect(checkCorrectiveTags({ ...good, direction: 'both' })).toBeNull();
   });

@@ -150,6 +150,7 @@ export const ERROR_CODES = {
   assessment_locked: 'This assessment is finished and can no longer change.',
   assessment_start_failed: "Couldn't start the assessment. Please try again.",
   assessment_save_failed: "Couldn't save. Please try again.",
+  assessment_changed: 'Reload — this assessment changed since this screen opened.',
   assessment_finish_failed: "Couldn't finish the assessment. Please try again.",
   template_invalid: 'Give the template a name and pick between 1 and 20 tests.',
   template_name_taken: 'You already have a template with that name.',
