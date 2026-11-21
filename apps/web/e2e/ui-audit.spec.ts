@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { demoWorkspace, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
+import { demoWorkspace, freshClient, seedLibraryWorkout, seedProgram, unique } from './assign-helpers';
 import type { Database } from '@caltracker/shared';
 import { seedLog, serviceClient, signInAsCoach } from './helpers';
 import { AXE_ALLOW, UI_ALLOW, type AxeAllow, type Size, type UiAllow } from './ui-audit-allowlist';
@@ -24,7 +24,9 @@ type AuditPage = { name: string; path: string };
 // checked too (an empty feed would hide them).
 // `bodyMetrics`: two weight entries the coach logged, so the Body cards and a metric's page have a trend.
 // `strengthLog`: two finished squat workouts for the demo client, so Metrics' Strength rows and the exercise page show.
-type Group = { name: string; pages: AuditPage[]; seed?: true; communityPost?: true; strengthLog?: true; bodyMetrics?: true; signedOut?: AuditPage[] };
+// `assessment`: a fresh client with a finished Initial (ratings, numbers, notes) and a Retest 1 draft, so the tab's
+// cycle card and findings, the summary and the run screen are all checked.
+type Group = { name: string; pages: AuditPage[]; seed?: true; communityPost?: true; strengthLog?: true; bodyMetrics?: true; assessment?: true; signedOut?: AuditPage[] };
 
 const GROUPS: Group[] = [
   {
@@ -46,6 +48,7 @@ const GROUPS: Group[] = [
       { name: 'Client metrics', path: `${CLIENT}/metrics` },
       { name: 'Client food', path: `${CLIENT}/food` },
       { name: 'Client documents', path: `${CLIENT}/documents` },
+      { name: 'Client limitations', path: `${CLIENT}/limitations` },
       { name: 'Client settings', path: `${CLIENT}/settings` },
     ],
   },
@@ -73,6 +76,15 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    name: 'assessments',
+    assessment: true,
+    pages: [
+      { name: 'Assessments tab', path: '/clients/:client/limitations' },
+      { name: 'Assessment summary', path: '/clients/:client/assessments/:done' },
+      { name: 'Assessment run', path: '/clients/:client/assessments/:draft' },
+    ],
+  },
+  {
     name: 'account and sign-in',
     pages: [
       { name: 'Profile', path: '/profile' },
@@ -81,6 +93,49 @@ const GROUPS: Group[] = [
     signedOut: [{ name: 'Sign in', path: '/sign-in' }],
   },
 ];
+
+/** A fresh client of the demo workspace with a finished Initial and a Retest 1 draft. Delete the user to clean up. */
+async function seedAssessments(admin: ReturnType<typeof serviceClient>): Promise<{ client: string; done: string; draft: string }> {
+  const ws = await demoWorkspace(admin);
+  const client = await freshClient(admin, ws, 'Audit', `Assess${unique().slice(-5)}`);
+  const must = <R extends { data: unknown; error: unknown }>(r: R): NonNullable<R['data']> => {
+    if (r.error || r.data === null) throw new Error(`Seeding the assessment failed: ${JSON.stringify(r.error)}`);
+    return r.data as NonNullable<R['data']>;
+  };
+
+  const defs = must(await admin.from('assessment_test_definitions').select('id, test_key').is('workspace_id', null));
+  const def = (key: string) => defs.find((d) => d.test_key === key)!.id;
+  const cycle = must(await admin.from('assessment_cycles').insert({ workspace_id: ws, client_id: client, number: 1 }).select('id').single());
+  const today = new Date().toISOString().slice(0, 10);
+  const start = async (slot: 'initial' | 'retest_1', keys: string[]) => {
+    const a = must(await admin.from('assessments').insert({ workspace_id: ws, client_id: client, cycle_id: cycle.id, slot, assessed_on: today, foot_arch_left: 'flat', foot_arch_right: 'normal' }).select('id').single());
+    const tests = must(
+      await admin.from('assessment_tests').insert(keys.map((k, i) => ({ workspace_id: ws, assessment_id: a.id, position: i, definition_id: def(k), test_key: k, definition_version: 1, definition: {} }))).select('id, test_key'),
+    );
+    return { id: a.id, test: (k: string) => tests.find((t) => t.test_key === k)!.id };
+  };
+  const initial = await start('initial', ['overhead_squat', 'shoulder_mobility', 'static_posture']);
+  must(
+    await admin.from('assessment_checkpoint_results').insert([
+      { test_id: initial.test('overhead_squat'), workspace_id: ws, checkpoint_id: 'ohs.knee_valgus', side: 'L', severity: 'severe' },
+      { test_id: initial.test('overhead_squat'), workspace_id: ws, checkpoint_id: 'ohs.knee_valgus', side: 'R', severity: 'slight' },
+      { test_id: initial.test('overhead_squat'), workspace_id: ws, checkpoint_id: 'ohs.heel_rise', side: 'L', severity: 'slight' },
+      { test_id: initial.test('overhead_squat'), workspace_id: ws, checkpoint_id: 'ohs.head_forward', side: 'none', severity: 'slight' },
+      { test_id: initial.test('shoulder_mobility'), workspace_id: ws, checkpoint_id: 'shm.shoulder_hike', side: 'L', severity: 'slight' },
+      { test_id: initial.test('static_posture'), workspace_id: ws, checkpoint_id: 'posture.head_forward', side: 'none', severity: 'slight' },
+    ]).select('test_id'),
+  );
+  must(
+    await admin.from('assessment_measure_results').insert([
+      { test_id: initial.test('shoulder_mobility'), workspace_id: ws, measure_id: 'shm.reach_gap', side: 'L', value: 14, unit: 'cm', higher_is_better: false },
+      { test_id: initial.test('shoulder_mobility'), workspace_id: ws, measure_id: 'shm.reach_gap', side: 'R', value: 11, unit: 'cm', higher_is_better: false },
+    ]).select('test_id'),
+  );
+  must(await admin.from('assessment_tests').update({ status: 'done', note: 'Calves felt tight', follow_ups: { 'ohs.heel_lift_retest': 'better' } }).eq('assessment_id', initial.id).select('id'));
+  must(await admin.from('assessments').update({ status: 'done', score: 79 }).eq('id', initial.id).select('id'));
+  const draft = await start('retest_1', ['overhead_squat', 'push_up']);
+  return { client, done: initial.id, draft: draft.id };
+}
 
 const SIZES: { size: Size; use: { viewport: { width: number; height: number }; isMobile: boolean; hasTouch: boolean } }[] = [
   { size: 'phone', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
@@ -317,6 +372,10 @@ for (const { size, use } of SIZES) {
             .select('id');
           if (rows.error) throw rows.error;
           for (const r of rows.data) cleanup.push(() => admin.from('body_metrics').delete().eq('id', r.id));
+        }
+        if (group.assessment) {
+          Object.assign(ids, await seedAssessments(admin));
+          cleanup.push(() => admin.auth.admin.deleteUser(ids.client!));
         }
         if (group.communityPost) {
           const ws = await demoWorkspace(admin);
