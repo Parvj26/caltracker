@@ -11,6 +11,12 @@ import { serviceClient, signInAsCoach } from './helpers';
 // ASSESS_SHOTS=<dir> also saves screenshots there, to compare with the boards.
 
 const admin = serviceClient();
+
+// One worker runs the three sizes in turn: beforeAll / afterAll run per worker, so parallel sizes would each seed a
+// DNS Star into the shared demo workspace and delete it when done. Every coach-owned corrective is picked first, so
+// one size would pick another's DNS Star; once that was deleted, saving the picks failed (the exercise check in
+// assessment_exercise_picks' policy, shown as "You can't assess this client").
+test.describe.configure({ mode: 'default' });
 const createdUsers: string[] = [];
 const createdExercises: string[] = [];
 let workspaceId: string;
@@ -156,6 +162,14 @@ for (const { size, use } of SIZES) {
       await expect(dns).toContainText('2 × 5 each side');
       // The coach's own are picked before the first pick.
       await expect(dns).toHaveAttribute('aria-pressed', 'true');
+      // Other specs may have their own corrective exercises in the demo workspace right now (and delete them when
+      // done): keep only this test's own picked among the coach's.
+      const others = page.locator('[data-testid^="ex-group-"] button[aria-pressed="true"]').filter({ hasText: 'Yours' }).filter({ hasNotText: dnsName });
+      while ((await others.count()) > 0) {
+        const n = await others.count();
+        await others.first().click();
+        await expect(others).toHaveCount(n - 1);
+      }
       await expect(page.getByTestId('ex-group-calves-over')).toBeVisible();
       await expect(page.getByTestId('ex-group-upper_traps-over')).toBeVisible();
       await expectNoSidewaysScroll(page);

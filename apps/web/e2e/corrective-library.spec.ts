@@ -137,11 +137,11 @@ for (const { size, use } of SIZES) {
         const editing = page.getByRole('dialog', { name: 'Edit corrective exercise' });
         await expect(editing.getByRole('form', { name: 'Corrective exercise' })).toBeVisible();
         expect(await page.evaluate(() => !!document.activeElement?.closest('form[aria-label="Corrective exercise"]'))).toBe(true);
-        await editing.getByLabel('Reps (optional)').fill('9');
+        await editing.getByLabel('Reps', { exact: true }).fill('9');
         await editing.getByRole('button', { name: 'Cancel' }).click();
         await expect(view.getByText('2 × 5 each side')).toBeVisible();
         await view.getByRole('button', { name: 'Edit' }).click();
-        await expect(editing.getByLabel('Reps (optional)')).toHaveValue('5');
+        await expect(editing.getByLabel('Reps', { exact: true })).toHaveValue('5');
       }
       const edit = page.getByRole('dialog', { name: 'Edit corrective exercise' });
       await expect(edit.getByText(name)).toBeVisible();
