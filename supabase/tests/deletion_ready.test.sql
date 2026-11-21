@@ -26,6 +26,7 @@ select is(
     'body_measurements(client_id)>auth.users:c', 'body_measurements(entered_by)>auth.users:n',
     'body_metrics(client_id)>auth.users:c', 'body_metrics(entered_by)>auth.users:n',
     'client_documents(client_id)>auth.users:c', 'client_documents(uploaded_by)>auth.users:n',
+    'client_flags(client_id)>auth.users:c', 'client_flags(created_by)>auth.users:n',
     'client_goals(client_id)>auth.users:c',
     'client_invites(accepted_by)>auth.users:c', 'client_invites(created_by)>auth.users:n',
     'client_limitations(client_id)>auth.users:c',
@@ -180,6 +181,7 @@ insert into public.client_documents (workspace_id, client_id, name, storage_path
 values (:'ws', :'vic', 'InBody', :'ws' || '/' || :'vic' || '/' || :'doc_file' || '.pdf', 'application/pdf', 100, :'coach');
 insert into public.client_goals (workspace_id, client_id, goal) values (:'ws', :'vic', 'Run 5k');
 insert into public.client_limitations (workspace_id, client_id, body) values (:'ws', :'vic', 'Knee');
+insert into public.client_flags (workspace_id, client_id, region, side, type, note, created_by) values (:'ws', :'vic', 'knee', 'L', 'pain', 'Knee', :'coach');
 insert into public.client_notes (workspace_id, client_id, body, created_by) values (:'ws', :'vic', 'Note', :'coach');
 
 -- Food: a meal from the coach's list, a photo meal, and targets.

@@ -18,7 +18,7 @@ select is(
    join pg_tables t on t.schemaname = 'public' and t.tablename = c.table_name
    where c.table_schema = 'public' and c.column_name = 'workspace_id'),
   array[
-    'award_bonus_queue', 'awards', 'body_measurements', 'body_metrics', 'client_documents', 'client_goals', 'client_invite_plan_items', 'client_invites',
+    'award_bonus_queue', 'awards', 'body_measurements', 'body_metrics', 'client_documents', 'client_flags', 'client_goals', 'client_invite_plan_items', 'client_invites',
     'client_limitations', 'client_notes', 'client_stats', 'coach_meals', 'communities', 'community_blocks',
     'community_comments', 'community_members', 'community_notifications', 'community_post_images', 'community_posts',
     'community_reactions', 'community_reports', 'conversations', 'custom_metrics', 'exercise_overrides', 'exercise_prefs',
@@ -262,6 +262,7 @@ insert into public.client_documents (workspace_id, client_id, name, storage_path
 values (:'ws', :'vic', 'InBody', :'ws' || '/' || :'vic' || '/' || :'doc_file' || '.pdf', 'application/pdf', 100, :'coach');
 insert into public.client_goals (workspace_id, client_id, goal) values (:'ws', :'vic', 'Run 5k');
 insert into public.client_limitations (workspace_id, client_id, body) values (:'ws', :'vic', 'Knee');
+insert into public.client_flags (workspace_id, client_id, region, side, type, note) values (:'ws', :'vic', 'knee', 'L', 'pain', 'Knee');
 insert into public.client_notes (workspace_id, client_id, body, created_by) values (:'ws', :'vic', 'Note', :'coach');
 insert into public.meals (workspace_id, client_id, eaten_on, name, calories, coach_meal_id)
 values (:'ws', :'vic', current_date, 'AC Oats', 400, :'coach_meal');

@@ -77,20 +77,21 @@ select tests.act_as_anon();
 select throws_ok('select * from public.client_notes', '42501', null, 'anon cannot read notes');
 reset role;
 
--- ---------- Limitations / injuries (coach-private, one per client) ----------
-select tests.act_as(:'coach_a');
-select lives_ok(format($$insert into public.client_limitations (workspace_id, client_id, body) values (%L, %L, 'Left knee: no deep squats')$$,
-  :'ws_a', :'a1'), 'coach records limitations');
-select throws_ok(format($$insert into public.client_limitations (workspace_id, client_id, body) values (%L, %L, 'again')$$, :'ws_a', :'a1'),
-  '23505', null, 'there is one limitations record per client');
-select lives_ok(format($$insert into public.client_limitations (workspace_id, client_id, body) values (%L, %L, '')$$, :'ws_a', :'a2'),
-  'limitations may be cleared to empty');
-select throws_ok(format($$insert into public.client_limitations (workspace_id, client_id, body) values (%L, %L, repeat('x', 2001))$$, :'ws_b', :'b1'),
-  '42501', null, 'coach cannot write limitations in another workspace');
-select throws_ok(format($$update public.client_limitations set body = repeat('x', 2001) where client_id = %L$$, :'a1'),
+-- ---------- Limitations / injuries (coach-private, one per client; read-only since client_flags replaced it) ----------
+-- Rows as the migration owner: the apps no longer write this table (20261121000500_client_flags.sql).
+insert into public.client_limitations (workspace_id, client_id, body) values
+  (:'ws_a', :'a1', 'Left knee: no deep squats'), (:'ws_a', :'a2', '');
+select throws_ok(format($$insert into public.client_limitations (workspace_id, client_id, body) values (%L, %L, repeat('x', 2001))$$, :'ws_a', :'a2'),
   '23514', null, 'limitations over 2000 characters are refused');
-update public.client_limitations set body = 'Left knee: no deep squats. Shoulder ok.' where client_id = :'a1';
-select is((select body from public.client_limitations where client_id = :'a1'), 'Left knee: no deep squats. Shoulder ok.', 'coach edits limitations');
+select tests.act_as(:'coach_a');
+select is((select body from public.client_limitations where client_id = :'a1'), 'Left knee: no deep squats', 'coach still reads old limitations');
+select is((select count(*)::int from public.client_limitations), 2, 'coach reads every limitations record of the workspace');
+select throws_ok(format($$insert into public.client_limitations (workspace_id, client_id, body) values (%L, %L, 'again')$$, :'ws_a', :'a2'),
+  '42501', null, 'coach can no longer add limitations (flags replace them)');
+select throws_ok(format($$update public.client_limitations set body = 'edited' where client_id = %L$$, :'a1'),
+  '42501', null, 'coach can no longer edit limitations');
+select throws_ok(format($$insert into public.client_limitations (workspace_id, client_id, body) values (%L, %L, 'x')$$, :'ws_b', :'b1'),
+  '42501', null, 'coach cannot write limitations in another workspace');
 reset role;
 select tests.act_as(:'a1');
 select is((select count(*)::int from public.client_limitations), 0, 'the client cannot read their limitations record');
@@ -99,14 +100,13 @@ select throws_ok(format($$insert into public.client_limitations (workspace_id, c
 reset role;
 select tests.act_as(:'coach_b');
 select is((select count(*)::int from public.client_limitations), 0, 'another workspace''s coach reads no limitations');
-update public.client_limitations set body = 'hacked';
 delete from public.client_limitations;
 reset role;
 select tests.act_as(:'b1');
 select is((select count(*)::int from public.client_limitations), 0, 'another workspace''s client reads no limitations');
 reset role;
-select is((select count(*)::int from public.client_limitations where workspace_id = :'ws_a' and body <> 'hacked'), 2,
-  'another workspace''s coach cannot edit or delete limitations');
+select is((select count(*)::int from public.client_limitations where workspace_id = :'ws_a'), 2,
+  'another workspace''s coach cannot delete limitations');
 select tests.act_as_anon();
 select throws_ok('select * from public.client_limitations', '42501', null, 'anon cannot read limitations');
 reset role;
