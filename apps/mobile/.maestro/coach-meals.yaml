@@ -22,11 +22,11 @@ env:
     id: tab-coach
 - extendedWaitUntil:
     visible:
-      id: coach-strip-meals
+      id: open-coach-meals
       text: 'Meals from .*, 1 meal'
     timeout: 10000
 - tapOn:
-    id: coach-strip-meals
+    id: open-coach-meals
 - extendedWaitUntil:
     visible: 'Meals from .*'
     timeout: 10000

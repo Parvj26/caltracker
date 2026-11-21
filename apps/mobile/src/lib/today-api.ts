@@ -40,6 +40,18 @@ export async function fetchFirstName(userId: string): Promise<string | null> {
   return name;
 }
 
+/**
+ * Whether Today last showed this user the new-client view (no workouts ever), so the welcome on a fresh open can say
+ * "Welcome, Maya" rather than "Welcome back" before Today has loaded. Forgotten on Sign out with the other Today copies.
+ */
+export async function readCachedFirstTime(userId: string): Promise<boolean> {
+  return (await readJson(key('firstTime', userId))) === true;
+}
+
+export function cacheFirstTime(userId: string, firstTime: boolean): void {
+  writeJson(key('firstTime', userId), firstTime);
+}
+
 /** My full name for the Settings header ("Maya Thompson-Richardson"), saved like the first name. */
 export async function readCachedFullName(userId: string): Promise<string | null> {
   const v = await readJson(key('fullName', userId));
