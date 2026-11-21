@@ -259,6 +259,23 @@ describe('rounds', () => {
     expect(b!.sets.every((s) => s.restSeconds === 90)).toBe(true);
   });
 
+  it('addRound: each exercise copies its own last set (not a drop, not the first), "+ Set" on a superset', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    const [a, b] = sb.exercises;
+    d = updateSet(d, sb.id, a!.id, a!.sets[2]!.id, { targetRepsMin: 6, targetRepsMax: 6, targetWeightKg: 50 });
+    d = updateSet(d, sb.id, b!.id, b!.sets[2]!.id, { targetRepsMin: 15, targetRepsMax: 15, targetWeightKg: 10 });
+    d = addDrop(d, sb.id, a!.id, d.blocks[1]!.exercises[0]!.sets[2]!.id, makeId);
+    const out = valid(addRound(d, sb.id, makeId));
+    const [na, nb] = out.blocks[1]!.exercises;
+    expect(na!.sets.at(-1)).toMatchObject({ setType: 'normal', targetRepsMin: 6, targetWeightKg: 50 });
+    expect(nb!.sets.at(-1)).toMatchObject({ targetRepsMin: 15, targetWeightKg: 10 });
+    // "Only <exercise>" is addSet: that one exercise, the other unchanged.
+    const only = valid(addSet(d, sb.id, b!.id, makeId));
+    expect(nonDrop(only.blocks[1]!.exercises[0]!.sets)).toHaveLength(3);
+    expect(nonDrop(only.blocks[1]!.exercises[1]!.sets)).toHaveLength(4);
+  });
+
   it('removeRound removes the last round (and its drops) from every exercise', () => {
     let d = base();
     const sb = d.blocks[1]!;
