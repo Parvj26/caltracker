@@ -37,6 +37,7 @@ export type SuggestedMark = {
 };
 
 const SIDE_ORDER: Record<MarkSide, number> = { L: 0, R: 1, none: 2 };
+const OPPOSITE: Record<MarkSide, MarkSide> = { L: 'R', R: 'L', none: 'none' };
 const MUSCLE_ORDER = new Map<string, number>(MUSCLE_IDS.map((id, i) => [id, i]));
 export const markKey = (muscleId: string, side: MarkSide) => (side === 'none' ? muscleId : `${muscleId}.${side}`);
 
@@ -66,7 +67,8 @@ export function suggestFromFindings(findings: readonly Finding[]): SuggestedMark
     for (const [status, muscles] of [['over', rule.over], ['under', rule.under]] as const) {
       for (const m of muscles) {
         for (const fs of f.sides) {
-          for (const side of sidesFor(m, fs.side)) {
+          const rated = rule.side === 'opposite' ? OPPOSITE[fs.side] : fs.side;
+          for (const side of sidesFor(m, rated)) {
             const key = markKey(m, side);
             let v = votes.get(key);
             if (!v) {

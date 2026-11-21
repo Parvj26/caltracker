@@ -1,5 +1,5 @@
 begin;
-select plan(58);
+select plan(59);
 
 -- Step 2 of movement assessments (migration 20261121002000_assessment_findings.sql): corrective library, muscle marks,
 -- "Also check" ticks, exercise picks, and photo uploads for a coach's own exercises.
@@ -178,6 +178,9 @@ select throws_ok(format($$select public.save_assessment_picks(%L, '[{"muscle_id"
 reset role;
 
 -- ---------- Photos for a coach's own exercise ----------
+select is((select public::text || '/' || file_size_limit::text || '/' || array_to_string(allowed_mime_types, ',')
+  from storage.buckets where id = 'exercise-images'), 'true/5242880/image/webp,image/jpeg',
+  'exercise-images stays public but takes only WebP or JPEG, at most 5 MB');
 select tests.act_as(:'coach_a');
 select lives_ok(format($$insert into storage.objects (bucket_id, name, owner) values ('exercise-images', 'custom/%s/%s/%s.webp', %L)$$,
   :'ws_a', :'dns', gen_random_uuid(), :'coach_a'), 'the coach uploads a photo for their own exercise');

@@ -304,6 +304,7 @@ insert into public.messages (conversation_id, workspace_id, sender_id, body) val
 insert into public.community_posts (community_id, workspace_id, author_id, body) values (:'comm2', :'ws2', :'zed', 'Zed post');
 
 -- Files: the workspace's folders, the deleted coaches' avatars, and others' files that stay.
+select gen_random_uuid() as ex_photo \gset
 insert into storage.objects (bucket_id, name, owner_id) values
   ('client-documents', :'ws' || '/' || :'vic' || '/' || :'doc_file' || '.pdf', :'coach'),
   ('scan-attachments', :'ws' || '/' || :'vic' || '/scan.pdf', :'coach'),
@@ -316,7 +317,9 @@ insert into storage.objects (bucket_id, name, owner_id) values
   ('avatars', :'olga' || '/avatar.webp', :'olga'),
   ('avatars', :'vic' || '/avatar.webp', :'vic'),
   ('meal-photos', :'ws2' || '/' || :'zed' || '/m-2.webp', :'zed'),
-  ('message-images', :'ws2' || '/' || :'conv2' || '/coach.webp', :'coach2');
+  ('message-images', :'ws2' || '/' || :'conv2' || '/coach.webp', :'coach2'),
+  -- A photo of the workspace's own exercise, uploaded by Olga (who stays): it goes with the workspace.
+  ('exercise-images', 'custom/' || :'ws' || '/' || :'coach_ex' || '/' || :'ex_photo' || '.webp', :'olga');
 
 -- Rows per workspace table, by workspace (works for every table on the reviewed list).
 create function pg_temp.ws_rows(p_ws uuid) returns table (tbl text, n bigint)
@@ -360,11 +363,12 @@ set local role service_role;
 select set_eq(
   format('select bucket_id, name from public.admin_coach_delete_files(%L, array[%L, %L]::uuid[])', :'ws', :'coach', :'stan'),
   format($$values ('avatars'::text, %L::text), ('avatars', %L), ('client-documents', %L), ('coach-meal-photos', %L),
-    ('community-images', %L), ('meal-photos', %L), ('message-images', %L), ('scan-attachments', %L)$$,
+    ('community-images', %L), ('meal-photos', %L), ('message-images', %L), ('scan-attachments', %L), ('exercise-images', %L)$$,
     :'coach' || '/avatar.webp', :'stan' || '/avatar.webp', :'ws' || '/' || :'vic' || '/' || :'doc_file' || '.pdf',
     :'ws' || '/' || :'coach_meal' || '-p.webp', :'ws' || '/' || :'vic' || '/' || :'vic_post' || '/a.webp',
-    :'ws' || '/' || :'vic' || '/m-1.webp', :'ws' || '/' || :'conv' || '/coach.webp', :'ws' || '/' || :'vic' || '/scan.pdf'),
-  'the files: every workspace folder and the deleted coaches'' files; not Olga''s, the clients'' avatars or Maya''s');
+    :'ws' || '/' || :'vic' || '/m-1.webp', :'ws' || '/' || :'conv' || '/coach.webp', :'ws' || '/' || :'vic' || '/scan.pdf',
+    'custom/' || :'ws' || '/' || :'coach_ex' || '/' || :'ex_photo' || '.webp'),
+  'the files: every workspace folder (own exercise photos too) and the deleted coaches'' files; not Olga''s avatar, the clients'' avatars or Maya''s');
 
 -- ---------- Refusals ----------
 select throws_ok(format('select public.admin_delete_coach(%L, %L, %L)', :'owner', :'ws', 'luis bueno coaching'), '22023',

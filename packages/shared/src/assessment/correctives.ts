@@ -43,6 +43,8 @@ export type BuiltinCorrective = {
   muscles: readonly MuscleId[];
   dose: CorrectiveDose;
   evidence: EvidenceLevel;
+  /** Added for step 2 (not in the evidence draft) for a muscle that had no built-in: Luis to confirm. */
+  needsReview?: true;
 };
 
 const reps = (sets: number, n: number, eachSide = false): CorrectiveDose => ({ sets, reps: n, seconds: null, eachSide });
@@ -56,6 +58,7 @@ const c = (key: string, libraryName: string, direction: CorrectiveDirection, mus
   dose,
   evidence,
 });
+const review = (b: BuiltinCorrective): BuiltinCorrective => ({ ...b, needsReview: true });
 
 /** The built-in defaults. Doses are the low end of the draft's ranges ("2–3 × 30 s" → 2 × 30 s). */
 export const BUILTIN_CORRECTIVES: readonly BuiltinCorrective[] = [
@@ -74,6 +77,15 @@ export const BUILTIN_CORRECTIVES: readonly BuiltinCorrective[] = [
   c('open_book', 'Open Book', 'over', ['chest'], reps(2, 8, true), 'expert_opinion'),
   c('cross_body_stretch', 'Cross-Body Stretch', 'over', ['rotator_cuff', 'shoulders'], secs(3, 30, true), 'moderate'),
   c('sleeper_stretch', 'Sleeper Stretch', 'over', ['rotator_cuff'], secs(3, 30, true), 'limited'),
+  // Release / stretch for muscles the draft had no built-in for (TFL, upper traps, low back, glute max): existing
+  // free-exercise-db exercises, marked for Luis to confirm.
+  review(c('foam_roll_tfl', 'Iliotibial Tract-SMR', 'over', ['tfl'], secs(1, 60, true), 'expert_opinion')),
+  review(c('standing_tfl_stretch', 'IT Band and Glute Stretch', 'over', ['tfl', 'glute_max'], secs(2, 30, true), 'expert_opinion')),
+  review(c('upper_trap_stretch', 'Side Neck Stretch', 'over', ['upper_traps', 'neck'], secs(2, 30, true), 'expert_opinion')),
+  review(c('childs_pose', "Child's Pose", 'over', ['lower_back', 'lats'], secs(2, 30), 'expert_opinion')),
+  review(c('cat_cow', 'Cat Stretch', 'over', ['lower_back'], secs(2, 30), 'expert_opinion')),
+  review(c('figure_four_stretch', 'Ankle On The Knee', 'over', ['glute_max'], secs(2, 30, true), 'expert_opinion')),
+  review(c('foam_roll_glutes', 'Piriformis-SMR', 'over', ['glute_max'], secs(1, 60, true), 'expert_opinion')),
   // Activate / strengthen (possibly underactive)
   c('banded_lateral_walk', 'Banded Lateral Walk', 'under', ['glute_medius', 'glute_max'], reps(3, 10, true), 'moderate'),
   c('side_lying_hip_abduction', 'Side-Lying Hip Abduction', 'under', ['glute_medius'], reps(3, 12, true), 'moderate'),

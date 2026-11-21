@@ -39,7 +39,7 @@ async function expectNoSidewaysScroll(page: Page) {
 
 type Rate = [checkpoint: string, side: 'left' | 'right' | null, severity: 'Slight' | 'Severe'];
 
-/** Runs the overhead squat then shoulder mobility, with these ratings and gaps, and finishes. */
+/** Runs the overhead squat then shoulder mobility, with these ratings and gaps, and finishes (through Findings). */
 async function runTwoTests(page: Page, phone: boolean, front: Rate[], side: Rate[], gap: [number, number], shoulder: Rate[]) {
   await expect(page.getByRole('heading', { level: 1, name: 'Overhead squat' })).toBeVisible();
   for (const [c, s, sev] of front) await rating(page, c, s ?? undefined).getByRole('button', { name: sev }).click();
@@ -52,7 +52,11 @@ async function runTwoTests(page: Page, phone: boolean, front: Rate[], side: Rate
   await page.getByRole('textbox', { name: 'Shoulder mobility gap · top hand, right' }).fill(String(gap[1]));
   for (const [c, s, sev] of shoulder) await rating(page, c, s ?? undefined).getByRole('button', { name: sev }).click();
   await expect(page.getByText('Draft saved')).toBeVisible();
-  await page.getByRole('button', { name: 'Finish' }).click();
+  // Step 2: the last test opens Findings; finish from Exercises without a workout.
+  await page.getByRole('button', { name: 'Review findings' }).click();
+  await expect(page.getByTestId('assessment-findings')).toBeVisible();
+  await page.getByTestId('pick-exercises').click();
+  await page.getByTestId('finish-without-workout').click();
   await expect(page.getByTestId('assessment-summary')).toBeVisible();
 }
 

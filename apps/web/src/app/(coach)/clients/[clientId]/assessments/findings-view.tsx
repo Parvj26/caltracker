@@ -27,7 +27,8 @@ import {
   type ReviewRow,
   type StoredMark,
 } from '@caltracker/shared';
-import { FindingsMap, MarkChip } from '@/components/assessment-findings/findings-map';
+import { FindingsMap } from '@/components/assessment-findings/findings-map';
+import { MarkChip } from '@/components/assessment-findings/labels';
 import type { RegionSide } from '@/components/body-map/state';
 import { ReloadButton } from '@/components/reload-button';
 import { AdaptiveDialog, Button, ErrorText, PhoneActionBar, SelectField, type AdaptiveDialogHandle } from '@/components/ui';

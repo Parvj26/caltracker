@@ -25,7 +25,7 @@ import {
   type Units,
   type WorkoutDoc,
 } from '@caltracker/shared';
-import { MarkChip, sidesText } from '@/components/assessment-findings/findings-map';
+import { MarkChip, sidesText } from '@/components/assessment-findings/labels';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, PhoneActionBar } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
@@ -254,7 +254,7 @@ export function ExercisesView({
                 )}
                 {shown ? (
                   g.options.length === 0 ? (
-                    <p className={base.caption}>No corrective exercise for this muscle yet. Add your own in Library › Corrective.</p>
+                    <p className={base.caption}>No exercise suggested for this muscle yet.</p>
                   ) : (
                     <ul className={styles.options}>
                       {g.options.map((o) => {

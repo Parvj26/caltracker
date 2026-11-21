@@ -67,6 +67,15 @@ describe('suggestMarks', () => {
     expect(s.filter((m) => m.muscleId === 'hip_flexors').map((m) => m.side)).toEqual(['L', 'R']);
   });
 
+  it('marks the other leg for the straight-leg raise (the raised leg is rated; the leg that stays down is tight)', () => {
+    const s = suggestMarks([{ definition: test('active_straight_leg_raise'), status: 'done', results: [r('aslr.down_leg_moves', 'L', 'slight')] }]);
+    expect(s.filter((m) => m.muscleId === 'hip_flexors').map((m) => m.side)).toEqual(['R']);
+    expect(s.filter((m) => m.muscleId === 'glute_max').map((m) => m.side)).toEqual(['R']);
+    expect(s.filter((m) => m.muscleId === 'abs').map((m) => m.side)).toEqual(['none']);
+    const p = suggestMarks([{ definition: test('active_straight_leg_raise'), status: 'done', results: [r('aslr.pelvis_moves', 'R', 'severe')] }]);
+    expect(p.filter((m) => m.muscleId === 'quads').map((m) => m.side)).toEqual(['L']);
+  });
+
   it('keeps abs as one region', () => {
     const s = suggestMarks([{ definition: test('push_up'), status: 'done', results: [r('pu.lumbar_sag', 'none', 'slight')] }]);
     expect(s.filter((m) => m.muscleId === 'abs')).toEqual([expect.objectContaining({ side: 'none', status: 'under' })]);

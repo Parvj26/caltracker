@@ -205,8 +205,10 @@ for (const { size, use } of SIZES) {
       await expect(findings.getByTestId('confirmed-findings')).toContainText('Glute medius · L R');
       await expect(findings.getByTestId('confirmed-findings')).toContainText('Upper traps · L');
       await expect(findings.getByTestId('confirmed-findings')).not.toContainText('TFL');
+      await expect(page.getByTestId('report-priorities')).toContainText('Glute medius · L R');
+      await expect(page.getByTestId('report-suggested').getByRole('link', { name: 'Open in builder' })).toBeVisible();
       await shot(page, `${size}-AS6-summary-findings`);
-      await findings.getByRole('link', { name: 'Review' }).click();
+      await findings.getByRole('link', { name: 'Findings' }).click();
       await expect(page.getByText('This assessment is finished, so its findings are locked.')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Confirm left Glute medius' })).toHaveCount(0);
     });

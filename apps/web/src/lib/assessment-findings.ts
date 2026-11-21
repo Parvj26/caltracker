@@ -85,7 +85,9 @@ export async function loadCorrectiveChoices(supabase: Supabase, workspaceId: str
       .select('id, direction, default_sets, default_reps, default_seconds, each_side, created_at, exercises (id, name, tracking_type, image_paths), corrective_exercise_muscles (muscle_id, side)')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false }),
-    supabase.from('exercises').select('id, name, tracking_type, image_paths').is('workspace_id', null).in('name', names),
+    // Case-insensitive match (ilike with no wildcards: the names have no % _ " , or \, a shared test checks), each
+    // quoted for the array literal (names have spaces, brackets and apostrophes).
+    supabase.from('exercises').select('id, name, tracking_type, image_paths').is('workspace_id', null).ilikeAnyOf('name', names.map((n) => `"${n}"`)),
   ]);
   if (own.error) throw new Error(`Could not load corrective exercises: ${own.error.message}`);
   if (lib.error) throw new Error(`Could not load corrective exercises: ${lib.error.message}`);
@@ -107,8 +109,9 @@ export async function loadCorrectiveChoices(supabase: Supabase, workspaceId: str
     ];
   });
 
-  // `in` matches exact names; library names are matched case-insensitively here (the import keeps the case given).
-  const byName = new Map(lib.data.map((e) => [e.name.toLowerCase(), e]));
+  // Two built-ins can differ only in case ("Split Squats"): the first one found wins.
+  const byName = new Map<string, ExerciseRow>();
+  for (const e of lib.data) if (!byName.has(e.name.toLowerCase())) byName.set(e.name.toLowerCase(), e);
   const builtins: CorrectiveChoice[] = BUILTIN_CORRECTIVES.flatMap((b) => {
     const e = byName.get(b.libraryName.toLowerCase());
     if (!e) return [];

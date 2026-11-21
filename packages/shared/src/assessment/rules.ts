@@ -95,6 +95,11 @@ export type FindingRule = {
   /** Built-in corrective keys (correctives.ts), best first. */
   exercises: readonly string[];
   evidence: EvidenceLevel;
+  /**
+   * 'opposite': the muscles are on the other side from the one rated. The straight-leg raise is rated on the raised leg,
+   * but "the other leg lifts" points at the tight hip flexor (and weak glute) of the leg that stays down.
+   */
+  side?: 'opposite';
   needsReview?: true;
 };
 
@@ -105,7 +110,7 @@ const KNEE_VALGUS = rule({
   under: ['glute_medius', 'glute_max'],
   alsoConsider: ['Deep hip rotators (under glute max)'],
   checks: ['ankle_mobility'],
-  exercises: ['knee_to_wall_ankle_mobilization', 'banded_lateral_walk', 'side_lying_hip_abduction', 'single_leg_glute_bridge', 'goblet_squat', 'step_down', 'standing_calf_stretch'],
+  exercises: ['knee_to_wall_ankle_mobilization', 'banded_lateral_walk', 'side_lying_hip_abduction', 'single_leg_glute_bridge', 'goblet_squat', 'step_down', 'standing_calf_stretch', 'foam_roll_tfl', 'standing_tfl_stretch'],
   evidence: 'moderate',
 });
 
@@ -114,7 +119,7 @@ const TRUNK_SAG = rule({
   under: ['abs', 'obliques', 'glute_max'],
   alsoConsider: [],
   checks: ['trunk_control'],
-  exercises: ['incline_push_up', 'front_plank', 'dead_bug', 'glute_bridge', 'bird_dog'],
+  exercises: ['incline_push_up', 'front_plank', 'dead_bug', 'glute_bridge', 'bird_dog', 'childs_pose'],
   evidence: 'expert_opinion',
 });
 
@@ -123,7 +128,7 @@ const HEAD_FORWARD = rule({
   under: [],
   alsoConsider: ['Neck: deep neck flexors (weak) and upper neck extensors (tight)'],
   checks: [],
-  exercises: ['chin_tuck', 'front_plank', 'incline_push_up'],
+  exercises: ['chin_tuck', 'front_plank', 'incline_push_up', 'upper_trap_stretch'],
   evidence: 'limited',
 });
 
@@ -134,6 +139,7 @@ const ASLR_DOWN_LEG = rule({
   checks: ['hip_flexor_length'],
   exercises: ['half_kneeling_hip_flexor_stretch', 'active_leg_lowering', 'glute_bridge', 'dead_bug'],
   evidence: 'limited',
+  side: 'opposite',
 });
 
 const SHOULDER_HIKE = rule({
@@ -141,7 +147,7 @@ const SHOULDER_HIKE = rule({
   under: ['mid_lower_traps'],
   alsoConsider: ['Serratus anterior'],
   checks: [],
-  exercises: ['prone_y_raise', 'wall_slide', 'side_lying_external_rotation'],
+  exercises: ['prone_y_raise', 'wall_slide', 'side_lying_external_rotation', 'upper_trap_stretch'],
   evidence: 'limited',
   needsReview: true,
 });
@@ -151,7 +157,7 @@ const SLHH_GLUTE_MED = rule({
   under: ['glute_medius'],
   alsoConsider: [],
   checks: ['trunk_control'],
-  exercises: ['side_lying_hip_abduction', 'clamshell', 'side_plank', 'banded_lateral_walk'],
+  exercises: ['side_lying_hip_abduction', 'clamshell', 'side_plank', 'banded_lateral_walk', 'foam_roll_tfl'],
   evidence: 'limited',
   needsReview: true,
 });
@@ -161,7 +167,7 @@ const HIP_IR = rule({
   under: [],
   alsoConsider: ['Deep hip rotators and hip joint shape'],
   checks: ['hip_rotation'],
-  exercises: ['quadruped_rock_back'],
+  exercises: ['quadruped_rock_back', 'figure_four_stretch', 'foam_roll_glutes'],
   evidence: 'expert_opinion',
   needsReview: true,
 });
@@ -200,7 +206,7 @@ export const FINDING_RULES: Readonly<Record<string, FindingRule>> = {
     under: ['glute_medius', 'glute_max'],
     alsoConsider: [],
     checks: ['pain_history'],
-    exercises: ['split_squat', 'step_down', 'single_leg_rdl', 'side_lying_hip_abduction', 'goblet_squat'],
+    exercises: ['split_squat', 'step_down', 'single_leg_rdl', 'side_lying_hip_abduction', 'goblet_squat', 'standing_tfl_stretch'],
     evidence: 'expert_opinion',
   }),
   'ohs.forward_lean': rule({
@@ -216,7 +222,7 @@ export const FINDING_RULES: Readonly<Record<string, FindingRule>> = {
     under: ['glute_max', 'hamstrings', 'abs'],
     alsoConsider: [],
     checks: ['hands_on_hips'],
-    exercises: ['dead_bug', 'half_kneeling_hip_flexor_stretch', 'glute_bridge', 'front_plank', 'kneeling_lat_stretch', 'wall_slide'],
+    exercises: ['dead_bug', 'half_kneeling_hip_flexor_stretch', 'glute_bridge', 'front_plank', 'kneeling_lat_stretch', 'wall_slide', 'childs_pose', 'cat_cow'],
     evidence: 'expert_opinion',
   }),
   'ohs.arms_fall_forward': rule({
@@ -235,7 +241,7 @@ export const FINDING_RULES: Readonly<Record<string, FindingRule>> = {
     under: ['glute_medius', 'glute_max'],
     alsoConsider: ['Deep hip rotators (under glute max)'],
     checks: ['ankle_mobility'],
-    exercises: ['step_down', 'banded_lateral_walk', 'side_lying_hip_abduction', 'single_leg_glute_bridge', 'split_squat', 'knee_to_wall_ankle_mobilization'],
+    exercises: ['step_down', 'banded_lateral_walk', 'side_lying_hip_abduction', 'single_leg_glute_bridge', 'split_squat', 'knee_to_wall_ankle_mobilization', 'foam_roll_tfl', 'standing_tfl_stretch'],
     evidence: 'moderate',
   }),
   'sls.pelvic_drop': rule({
@@ -243,7 +249,7 @@ export const FINDING_RULES: Readonly<Record<string, FindingRule>> = {
     under: ['glute_medius'],
     alsoConsider: [],
     checks: [],
-    exercises: ['side_lying_hip_abduction', 'side_plank', 'single_leg_glute_bridge', 'step_down', 'banded_lateral_walk'],
+    exercises: ['side_lying_hip_abduction', 'side_plank', 'single_leg_glute_bridge', 'step_down', 'banded_lateral_walk', 'childs_pose'],
     evidence: 'moderate',
   }),
   'sls.trunk_lateral_lean': rule({
@@ -251,7 +257,7 @@ export const FINDING_RULES: Readonly<Record<string, FindingRule>> = {
     under: ['glute_medius', 'obliques'],
     alsoConsider: [],
     checks: ['trunk_control'],
-    exercises: ['side_plank', 'suitcase_carry', 'side_lying_hip_abduction', 'step_down'],
+    exercises: ['side_plank', 'suitcase_carry', 'side_lying_hip_abduction', 'step_down', 'childs_pose'],
     evidence: 'limited',
   }),
   'sls.foot_collapse': rule({
@@ -287,7 +293,7 @@ export const FINDING_RULES: Readonly<Record<string, FindingRule>> = {
     under: ['mid_lower_traps'],
     alsoConsider: ['Serratus anterior'],
     checks: [],
-    exercises: ['side_lying_external_rotation', 'prone_t_raise', 'prone_y_raise', 'push_up_plus', 'incline_push_up'],
+    exercises: ['side_lying_external_rotation', 'prone_t_raise', 'prone_y_raise', 'push_up_plus', 'incline_push_up', 'upper_trap_stretch'],
     evidence: 'limited',
   }),
   'pu.head_forward': HEAD_FORWARD,
@@ -307,7 +313,7 @@ export const FINDING_RULES: Readonly<Record<string, FindingRule>> = {
     under: ['glute_medius'],
     alsoConsider: [],
     checks: ['trunk_control'],
-    exercises: ['side_lying_hip_abduction', 'side_plank', 'clamshell'],
+    exercises: ['side_lying_hip_abduction', 'side_plank', 'clamshell', 'childs_pose'],
     evidence: 'limited',
     needsReview: true,
   }),
@@ -319,7 +325,7 @@ export const FINDING_RULES: Readonly<Record<string, FindingRule>> = {
     under: ['abs', 'obliques'],
     alsoConsider: [],
     checks: ['upper_back_mobility'],
-    exercises: ['dead_bug', 'wall_slide', 'kneeling_lat_stretch', 'front_plank'],
+    exercises: ['dead_bug', 'wall_slide', 'kneeling_lat_stretch', 'front_plank', 'childs_pose'],
     evidence: 'expert_opinion',
     needsReview: true,
   }),
