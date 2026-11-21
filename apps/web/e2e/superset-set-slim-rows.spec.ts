@@ -155,7 +155,12 @@ for (const { size, use } of SIZES) {
         await expect(set2.getByRole('button', { name: 'More reps' })).toBeVisible();
         await expect(set2.getByRole('button', { name: 'More weight' })).toHaveCount(0);
       }
-      // Rest (B has it): only the quick picks, no − / +.
+      // ↑ / ↓ on a focused reps box step it too (the keyboard's way to − / +).
+      const reps = set2.getByLabel('Reps', { exact: true });
+      await reps.click();
+      await page.keyboard.press('ArrowDown');
+      await expect(reps).toHaveValue('11');
+      await expect(reps).toBeFocused();
       expect(height).toBeGreaterThan(0);
     });
 
@@ -189,6 +194,59 @@ for (const { size, use } of SIZES) {
     });
 
     if (size === 'phone') {
+      for (const width of [375, 390]) {
+        test(`CW7: four boxes (weight, reps, time, rest) fit a ${width} pt phone: values not cut off, 44 pt boxes`, async ({ page }) => {
+          await page.setViewportSize({ width, height: 844 });
+          const workspaceId = await demoWorkspace(admin);
+          const w = await admin.from('workouts').insert({ workspace_id: workspaceId, name: `Four boxes ${unique()}` }).select('id').single();
+          if (w.error) throw w.error;
+          created.push(w.data.id);
+          const blk = await admin.from('workout_blocks').insert({ workout_id: w.data.id, workspace_id: workspaceId, position: 0, kind: 'straight' }).select('id').single();
+          const ex = await admin.from('exercises').select('id').eq('name', A).is('workspace_id', null).limit(1).single();
+          const we = await admin
+            .from('workout_exercises')
+            .insert({ block_id: blk.data!.id, workout_id: w.data.id, workspace_id: workspaceId, position: 0, exercise_id: ex.data!.id, tracking_type: 'weight_reps_time' })
+            .select('id')
+            .single();
+          if (we.error) throw we.error;
+          const sets = await admin.from('workout_sets').insert(
+            [0, 1].map((p) => ({
+              workout_exercise_id: we.data.id,
+              workout_id: w.data.id,
+              workspace_id: workspaceId,
+              position: p,
+              target_reps_min: 10,
+              target_reps_max: 10,
+              target_weight_kg: 102.5,
+              target_duration_s: 600,
+              rest_seconds: 90,
+            })),
+          );
+          if (sets.error) throw sets.error;
+          await openA(page, w.data.id);
+          const set1 = page.getByRole('group', { name: `${A} set 1`, exact: true }).locator('visible=true');
+          const boxes = [set1.getByLabel('Weight (kg)'), set1.getByLabel('Reps', { exact: true }), set1.getByLabel('Duration (m:ss)'), set1.getByLabel('Rest (m:ss)')];
+          await expect(boxes[0]!).toHaveValue('102.5');
+          await expect(boxes[2]!).toHaveValue('10:00');
+          await expect(boxes[3]!).toHaveValue('1:30');
+          for (const box of boxes) {
+            expect(await box.evaluate((el: HTMLInputElement) => el.scrollWidth <= el.clientWidth)).toBe(true);
+            const b = (await box.boundingBox())!;
+            expect(b.width).toBeGreaterThanOrEqual(44);
+            expect(b.height).toBeGreaterThanOrEqual(44);
+          }
+          expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+          // No room for − / + here: ↑ / ↓ step the weight instead, and × stays.
+          await boxes[0]!.click();
+          await expect(set1.getByRole('button', { name: 'More weight' })).toBeHidden();
+          await expect(set1.getByRole('button', { name: 'Remove set 1' })).toBeVisible();
+          await page.keyboard.press('ArrowUp');
+          await expect(boxes[0]!).toHaveValue('105');
+          await expect(boxes[0]!).toBeFocused();
+          await shot(page, `cw7-phone-four-boxes-${width}`);
+        });
+      }
+
       test('CW7: four sets and the add bar fit a phone screen with Safari’s bars', async ({ page }) => {
         // Safari's top and bottom bars leave about 750 of 844 points.
         await page.setViewportSize({ width: 390, height: 750 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode } from 'react';
 import {
   setKindOf,
   setKindPatch,
@@ -267,14 +267,21 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
   };
   const blur = () => setFocused(null);
   const reps = singleReps(set.targetRepsMin, set.targetRepsMax);
-  const step = (dir: 1 | -1) => {
-    if (focused === 'reps') {
+  const stepField = (field: Focused, dir: 1 | -1) => {
+    if (field === 'reps') {
       const n = stepReps(reps, dir);
       onChange({ targetRepsMin: n, targetRepsMax: n });
-    } else if (focused === 'weight') {
+    } else if (field === 'weight') {
       onChange({ targetWeightKg: stepWeight(set.targetWeightKg, dir, units) });
-    }
+    } else return;
     setStepped((k) => k + 1);
+  };
+  const step = (dir: 1 | -1) => stepField(focused, dir);
+  /** ↑ / ↓ in the reps or weight box step it like + / − (the keyboard's way to them, on every size). */
+  const arrows = (field: Focused, e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    stepField(field, e.key === 'ArrowUp' ? 1 : -1);
   };
   const stepping = focused === 'reps' || focused === 'weight';
   const keep = (e: { preventDefault: () => void }) => e.preventDefault();
@@ -319,6 +326,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
             parse={parseWhole}
             resetKey={focused === 'reps' ? stepped : 0}
             onFocus={() => focusOn('reps')}
+            onKeyDown={(e) => arrows('reps', e)}
             onBlur={blur}
             onCommit={(n) => onChange({ targetRepsMin: n, targetRepsMax: n })}
           />
@@ -337,6 +345,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
             parse={parseDecimal}
             resetKey={focused === 'weight' ? stepped : 0}
             onFocus={() => focusOn('weight')}
+            onKeyDown={(e) => arrows('weight', e)}
             onBlur={blur}
             onCommit={(n) => onChange({ targetWeightKg: n === null ? null : toKg(n, units) })}
           />

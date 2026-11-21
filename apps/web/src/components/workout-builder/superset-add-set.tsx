@@ -6,6 +6,9 @@ import { useBackLayer } from '@/lib/open-layer';
 import { Icon } from './icons';
 import styles from './builder.module.css';
 
+const FULL_SHORT = '20 sets max';
+const FULL_REASON = 'An exercise has 20 sets, the most allowed. Remove one to add more.';
+
 /** The ▾ menu's one item: "Only Chest Press (C1)". */
 export const onlyThisLabel = (exerciseName: string, badge: string) => `Only ${exerciseName}${badge ? ` (${badge})` : ''}`;
 
@@ -20,12 +23,18 @@ export function SupersetAddSet({
   onRound,
   onOnlyThis,
   phone = false,
+  full = false,
+  onlyFull = false,
 }: {
   exerciseName: string;
   badge: string;
   onRound: () => void;
   onOnlyThis: () => void;
   phone?: boolean;
+  /** An exercise in the superset already has the most sets allowed: no more rounds. */
+  full?: boolean;
+  /** This exercise already has the most sets allowed. */
+  onlyFull?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   useBackLayer(open, () => setOpen(false));
@@ -53,25 +62,23 @@ export function SupersetAddSet({
   }
 
   const only = onlyThisLabel(exerciseName, badge);
+  const reasonId = useId();
   return (
     <div ref={wrapRef} className={cx(styles.splitAddSet, phone && styles.splitAddSetPhone)}>
       <button
         type="button"
         className={styles.splitMain}
         aria-label="Add a set to every exercise in the superset"
-        title="Adds a copy of each exercise's last set"
+        aria-describedby={full ? reasonId : undefined}
+        title={full ? FULL_REASON : "Adds a copy of each exercise's last set"}
+        disabled={full}
         onClick={onRound}
         data-ph-capture-attribute-label="workout_add_round"
       >
-        {phone ? (
-          <>
-            + Set <span className={styles.addSetHint}>copies last sets</span>
-          </>
-        ) : (
-          <>
-            + Set <span className={styles.addSetHint}>(copies last sets)</span>
-          </>
-        )}
+        + Set{' '}
+        <span id={reasonId} className={styles.addSetHint}>
+          {full ? FULL_SHORT : phone ? 'copies last sets' : '(copies last sets)'}
+        </span>
       </button>
       <button
         type="button"
@@ -94,6 +101,8 @@ export function SupersetAddSet({
               role="menuitem"
               ref={itemRef}
               className={styles.menuItem}
+              disabled={onlyFull}
+              title={onlyFull ? FULL_REASON : undefined}
               onClick={() => {
                 setOpen(false);
                 onOnlyThis();

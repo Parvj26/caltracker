@@ -43,7 +43,15 @@ export function SetTable({ sets, names, trackingType, units, restShown, errors, 
   // Number, type letter, one share of the width per box (at most 8rem each, so short rows don't stretch), the tray.
   const style = { '--set-cols': `var(--set-num) var(--set-type) repeat(${columns.length}, minmax(0, 8rem)) 1fr var(--set-tray)` } as CSSProperties;
   return (
-    <div className={styles.sets} style={style} data-compact={compact || undefined} data-many={boxes >= 3 || undefined}>
+    <div
+      className={styles.sets}
+      style={style}
+      data-compact={compact || undefined}
+      data-many={boxes >= 3 || undefined}
+      // Four boxes: the end slot stays × sized, so every box keeps room for "102.5" or "10:00" (no − / +; typing
+      // and the ↑ / ↓ keys still step).
+      data-crowded={boxes >= 4 || undefined}
+    >
       <div className={styles.setColumns} aria-hidden="true">
         <span>Set</span>
         <span>Type</span>

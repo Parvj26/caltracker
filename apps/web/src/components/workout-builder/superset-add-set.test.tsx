@@ -19,4 +19,10 @@ describe('a superset’s + Set ▾', () => {
     expect(phone).toContain('copies last sets');
     expect(phone).not.toContain('(copies last sets)');
   });
+
+  it('is off, saying why, once an exercise has 20 sets', () => {
+    const html = renderToStaticMarkup(<SupersetAddSet exerciseName="Chest Press" badge="C1" onRound={() => {}} onOnlyThis={() => {}} full />);
+    expect(html).toMatch(/<button[^>]*aria-label="Add a set to every exercise in the superset"[^>]*disabled=""/);
+    expect(html).toContain('20 sets max');
+  });
 });

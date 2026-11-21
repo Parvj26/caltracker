@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES } from '@caltracker/shared';
+import { MAX_CHOICE_OPTIONS, MAX_SETS, MAX_SUBSTITUTES, canAddRound } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import { Button, ErrorText } from '@/components/ui';
@@ -241,7 +241,15 @@ export function PhoneExerciseEditor({ card, place, count, onGo, onClose, units, 
 
       <div className={styles.phoneEditorBar} hidden={keyboard || undefined}>
         {!choice && block.kind === 'superset' ? (
-          <SupersetAddSet exerciseName={first.exerciseName} badge={card.badge} onRound={actions.onAddRound} onOnlyThis={() => actions.onAddSet(first.id)} phone />
+          <SupersetAddSet
+            exerciseName={first.exerciseName}
+            badge={card.badge}
+            full={!canAddRound(block)}
+            onlyFull={first.sets.length >= MAX_SETS}
+            onRound={actions.onAddRound}
+            onOnlyThis={() => actions.onAddSet(first.id)}
+            phone
+          />
         ) : !choice ? (
           <button type="button" className={styles.phoneAddSet} aria-label={`Add a set to ${first.exerciseName}`} onClick={() => actions.onAddSet(first.id)} data-ph-capture-attribute-label="workout_add_set">
             + Set <span className={styles.addSetHint}>copies last set</span>

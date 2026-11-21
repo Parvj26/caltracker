@@ -3,9 +3,11 @@
 import { useId, useState } from 'react';
 import {
   MAX_CHOICE_OPTIONS,
+  MAX_SETS,
   MAX_SUBSTITUTES,
   TEMPO_PLACEHOLDER,
   blockCollapsedSummary,
+  canAddRound,
   exerciseCollapsedLine,
   parseTempo,
   setShowsRest,
@@ -352,7 +354,14 @@ export function BlockEditor({
           />
           <div className={styles.exerciseFooter}>
             {block.kind === 'superset' ? (
-              <SupersetAddSet exerciseName={ex.exerciseName} badge={badge} onRound={actions.onAddRound} onOnlyThis={() => actions.onAddSet(ex.id)} />
+              <SupersetAddSet
+                exerciseName={ex.exerciseName}
+                badge={badge}
+                full={!canAddRound(block)}
+                onlyFull={ex.sets.length >= MAX_SETS}
+                onRound={actions.onAddRound}
+                onOnlyThis={() => actions.onAddSet(ex.id)}
+              />
             ) : (
               <AddSetButton label={`Add a set to ${ex.exerciseName}`} onClick={() => actions.onAddSet(ex.id)} />
             )}

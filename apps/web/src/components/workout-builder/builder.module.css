@@ -538,6 +538,10 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   .sets { --set-tray: calc(2 * var(--ct-tap-min) + var(--ct-space-1)); }
   .setTray .stepButton { height: var(--ct-tap-min); }
   .setTray[data-stepping] .removeSet { display: none; }
+  /* Four boxes: no room for − / + beside them, so the slot keeps × (see SetTable data-crowded). */
+  .sets[data-crowded] { --set-tray: var(--ct-tap-min); }
+  .sets[data-crowded] .setTray .stepButton { display: none; }
+  .sets[data-crowded] .setTray[data-stepping] .removeSet { display: grid; }
 }
 
 /* iPad portrait: each card folds to one line ("Bench Press" / "4 × 8 @ 60 kg · rest 1:30"); one is open at a time.
@@ -1039,3 +1043,4 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 .splitAddSetPhone .splitMain { flex: 1; flex-direction: column; gap: 0; font-size: 17px; }
 .splitAddSetPhone .addSetHint { white-space: nowrap; }
 .splitAddSetPhone .splitMenu { top: auto; bottom: 100%; margin: 0 0 var(--ct-space-1); }
+.splitMain:disabled { cursor: not-allowed; color: var(--ct-ink-muted); background: none; }
