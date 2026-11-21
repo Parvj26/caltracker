@@ -6,7 +6,7 @@ import type { ErrorCode } from '@caltracker/shared';
 import { AdaptiveDialog, Button, ErrorText, type AdaptiveDialogHandle } from '@/components/ui';
 import { PhotoError } from '@/lib/image-resize';
 import { MAX_EXERCISE_PHOTOS } from '@/lib/corrective-library';
-import { exercisePhotoUrl, uploadExercisePhoto } from '@/lib/exercise-photos';
+import { PhotoTooLargeError, exercisePhotoUrl, uploadExercisePhoto } from '@/lib/exercise-photos';
 import { invalidateExerciseIndex } from '@/lib/exercise-index';
 import { setExercisePhotos } from '../actions';
 import styles from './exercise-photos.module.css';
@@ -54,7 +54,7 @@ export function ExercisePhotos({ workspaceId, exerciseId, name, paths }: { works
       if (await save([...shown, path])) setStatus('Photo added.');
       else setStatus('');
     } catch (e) {
-      setError(e instanceof PhotoError ? { code: 'photo_prepare_failed', text: e.message } : { code: 'exercise_photo_failed' });
+      setError(e instanceof PhotoTooLargeError ? { code: 'exercise_photo_too_large' } : e instanceof PhotoError ? { code: 'photo_prepare_failed', text: e.message } : { code: 'exercise_photo_failed' });
       setStatus('');
     } finally {
       setBusy(false);

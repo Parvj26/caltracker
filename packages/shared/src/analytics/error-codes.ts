@@ -286,6 +286,7 @@ export const ERROR_CODES = {
   corrective_delete_failed: "Couldn't delete the corrective exercise. Please try again.",
   exercise_photo_limit: 'An exercise can have up to 2 photos.',
   exercise_photo_failed: "Couldn't save the photo. Please try again.",
+  exercise_photo_too_large: 'That photo is too big (over 5 MB even after shrinking). Try a smaller or simpler photo.',
   invite_rename_failed: "Couldn't save the name. Please try again.",
   invite_plan_save_failed: "Couldn't save the plan. Please try again.",
   invite_email_same: 'That is the email this invite already went to.',

@@ -26,7 +26,7 @@ import { quickCreateExercise, setExercisePhotos } from '@/app/(coach)/exercises/
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { invalidateExerciseIndex, loadExerciseIndex } from '@/lib/exercise-index';
 import { PhotoError } from '@/lib/image-resize';
-import { uploadExercisePhoto } from '@/lib/exercise-photos';
+import { PhotoTooLargeError, uploadExercisePhoto } from '@/lib/exercise-photos';
 import { bothSides, muscleTagLabel, tagsByMuscle, toggleTag, type LibraryItem } from '@/lib/corrective-library';
 import { deleteCorrective, saveCorrective } from './actions';
 import { CorrectiveSummary } from './parts';
@@ -195,7 +195,7 @@ export function CorrectiveDialog({
       router.refresh();
       await ref.current?.close();
     } catch (e) {
-      setError(e instanceof PhotoError ? { code: 'photo_prepare_failed', text: e.message } : { code: 'corrective_save_failed' });
+      setError(e instanceof PhotoTooLargeError ? { code: 'exercise_photo_too_large' } : e instanceof PhotoError ? { code: 'photo_prepare_failed', text: e.message } : { code: 'corrective_save_failed' });
     } finally {
       setPending(false);
     }
