@@ -24,7 +24,8 @@ import {
 } from '@/lib/log-api';
 import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
-import { fetchFirstName, readCachedFirstName } from '@/lib/today-api';
+import { cacheFirstTime, fetchFirstName, readCachedFirstName } from '@/lib/today-api';
+import { useWelcomeState, welcomeGate } from '@/lib/welcome-gate';
 import { allWorkoutsDone, greeting, headerDate, upNextLine, welcome } from '@/lib/today-logic';
 import { nextUpLabel } from '@/lib/log-flow-model';
 import { useActiveLog } from '@/lib/use-active-log';
@@ -169,10 +170,16 @@ export default function Today() {
   // Set when the logging screen is opened, cleared when Today is back in view: one tap, one screen.
   const navigating = useRef(false);
 
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+
   const load = useCallback(async () => {
     const ticket = ++latest.current;
     try {
       const next = await loadToday();
+      // For the welcome on the next fresh open: "Welcome, Maya" for a new client, else "Welcome back".
+      const uid = userIdRef.current;
+      if (uid && (next.kind === 'first-time' || !next.offline)) cacheFirstTime(uid, next.kind === 'first-time');
       if (next.kind === 'today') {
         setPlans((p) => ({ ...p, ...next.plans }));
         void next.plansLater?.then((later) => setPlans((p) => ({ ...p, ...later })));
@@ -186,7 +193,22 @@ export default function Today() {
       if (ticket !== latest.current) return;
       setError({ code: 'today_load_failed', text: LOAD_FAILED });
     }
+    // Today (or its error) is on screen: the welcome fades into it.
+    welcomeGate.todayReady();
   }, []);
+
+  // The welcome waits for Today only while Today is there to load.
+  useEffect(() => welcomeGate.mountToday(), []);
+
+  // A fresh open after more than 10 minutes away: read Today again (the day may have changed), under the welcome.
+  const { opens } = useWelcomeState();
+  const seenOpens = useRef(opens);
+  useEffect(() => {
+    if (opens === seenOpens.current) return;
+    seenOpens.current = opens;
+    setToday(localToday());
+    void load();
+  }, [opens, load]);
 
   useFocusEffect(
     useCallback(() => {
