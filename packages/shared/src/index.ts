@@ -176,6 +176,7 @@ export {
   addDrop,
   addExerciseToSuperset,
   addRound,
+  canAddRound,
   addSet,
   addStraightBlock,
   addStraightBlocks,

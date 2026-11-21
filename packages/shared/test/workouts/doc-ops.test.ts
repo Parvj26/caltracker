@@ -5,6 +5,7 @@ import {
   addDrop,
   addExerciseToSuperset,
   addRound,
+  canAddRound,
   addSection,
   addSet,
   addStraightBlock,
@@ -274,6 +275,48 @@ describe('rounds', () => {
     const only = valid(addSet(d, sb.id, b!.id, makeId));
     expect(nonDrop(only.blocks[1]!.exercises[0]!.sets)).toHaveLength(3);
     expect(nonDrop(only.blocks[1]!.exercises[1]!.sets)).toHaveLength(4);
+  });
+
+  it('addRound copies each last working set\'s type and to-failure (a drop is skipped), like + Set', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    const [a] = sb.exercises;
+    d = updateSet(d, sb.id, a!.id, a!.sets[2]!.id, { setType: 'normal', toFailure: true });
+    d = addDrop(d, sb.id, a!.id, a!.sets[2]!.id, makeId);
+    const out = valid(addRound(d, sb.id, makeId));
+    expect(out.blocks[1]!.exercises[0]!.sets.at(-1)).toMatchObject({ setType: 'normal', toFailure: true });
+    let w = base();
+    const b2 = w.blocks[1]!.exercises[1]!;
+    w = updateSet(w, w.blocks[1]!.id, b2.id, b2.sets[2]!.id, { setType: 'warmup' });
+    expect(valid(addRound(w, w.blocks[1]!.id, makeId)).blocks[1]!.exercises[1]!.sets.at(-1)!.setType).toBe('warmup');
+  });
+
+  it('uneven supersets: a set that now goes straight on to a later exercise loses its hidden rest', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    const [a, b] = sb.exercises;
+    // A 3 sets, B 2: A's 3rd set is its round's last, so it rests.
+    d = removeSet(d, sb.id, b!.id, b!.sets[2]!.id);
+    d = updateSet(d, sb.id, a!.id, a!.sets[2]!.id, { restSeconds: 120 });
+    expect(d.blocks[1]!.exercises[0]!.sets[2]!.restSeconds).toBe(120);
+    // B gets a 3rd set ("Only B"): A's 3rd set now goes straight on to it.
+    const viaSet = valid(addSet(d, sb.id, b!.id, makeId));
+    expect(viaSet.blocks[1]!.exercises[0]!.sets[2]!.restSeconds).toBe(0);
+    expect(viaSet.blocks[1]!.exercises[1]!.sets[2]!.restSeconds).toBeGreaterThan(0);
+    // A round on the uneven superset: A's 3rd set too, and the new round rests only after B.
+    const viaRound = valid(addRound(d, sb.id, makeId));
+    expect(viaRound.blocks[1]!.exercises[0]!.sets.map((s) => s.restSeconds)).toEqual([0, 0, 0, 0]);
+    expect(viaRound.blocks[1]!.exercises[1]!.sets.at(-1)!.restSeconds).toBeGreaterThan(0);
+  });
+
+  it('canAddRound is false once an exercise has MAX_SETS sets (+ Set is then off)', () => {
+    let d = base();
+    const sb = d.blocks[1]!;
+    expect(canAddRound(sb)).toBe(true);
+    expect(canAddRound(d.blocks[0]!)).toBe(false);
+    for (let i = 0; i < 17; i++) d = addSet(d, sb.id, sb.exercises[0]!.id, makeId);
+    expect(canAddRound(d.blocks[1]!)).toBe(false);
+    expect(addRound(d, sb.id, makeId)).toEqual(d);
   });
 
   it('removeRound removes the last round (and its drops) from every exercise', () => {
