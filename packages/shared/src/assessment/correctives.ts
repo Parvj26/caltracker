@@ -151,7 +151,7 @@ export function checkCorrectiveTags(input: unknown): CorrectiveTagsInput | null 
     const key = `${m.muscleId as string}.${m.side}`;
     if (seen.has(key)) return null;
     seen.add(key);
-    muscles.push({ muscleId: m.muscleId as string, side: m.side as 'L' | 'R' | 'none' });
+    muscles.push({ muscleId: m.muscleId, side: m.side as 'L' | 'R' | 'none' });
   }
   if (new Set(muscles.map((m) => m.muscleId)).size > MAX_CORRECTIVE_MUSCLES) return null;
   const d = i.dose as Record<string, unknown> | null;

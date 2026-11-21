@@ -83,6 +83,9 @@ const GROUPS: Group[] = [
       { name: 'Assessments tab', path: '/clients/:client/limitations' },
       { name: 'Assessment summary', path: '/clients/:client/assessments/:done' },
       { name: 'Assessment run', path: '/clients/:client/assessments/:draft' },
+      { name: 'Assessment findings', path: '/clients/:client/assessments/:draft/findings' },
+      { name: 'Assessment findings (done)', path: '/clients/:client/assessments/:done/findings' },
+      { name: 'Assessment exercises', path: '/clients/:client/assessments/:done/exercises' },
     ],
   },
   {
@@ -133,6 +136,17 @@ async function seedAssessments(admin: ReturnType<typeof serviceClient>): Promise
     ]).select('test_id'),
   );
   must(await admin.from('assessment_tests').update({ status: 'done', note: 'Calves felt tight', follow_ups: { 'ohs.heel_lift_retest': 'better' } }).eq('assessment_id', initial.id).select('id'));
+  // Step 2: the coach's confirmed findings on it (the map and the exercise groups read these).
+  must(
+    await admin.from('assessment_muscle_marks').insert([
+      { assessment_id: initial.id, workspace_id: ws, muscle_id: 'glute_medius', side: 'L', status: 'under', review: 'confirmed', sources: ['ohs.knee_valgus'] },
+      { assessment_id: initial.id, workspace_id: ws, muscle_id: 'glute_medius', side: 'R', status: 'under', review: 'confirmed', sources: ['ohs.knee_valgus'] },
+      { assessment_id: initial.id, workspace_id: ws, muscle_id: 'adductors', side: 'L', status: 'over', review: 'confirmed', sources: ['ohs.knee_valgus'] },
+      { assessment_id: initial.id, workspace_id: ws, muscle_id: 'tfl', side: 'R', status: 'over', review: 'rejected', sources: ['ohs.knee_valgus'] },
+      { assessment_id: initial.id, workspace_id: ws, muscle_id: 'upper_traps', side: 'L', status: 'over', review: 'confirmed', sources: ['shm.shoulder_hike'] },
+    ]).select('muscle_id'),
+  );
+  must(await admin.from('assessment_checks').insert({ assessment_id: initial.id, workspace_id: ws, check_id: 'ankle_mobility' }).select('check_id'));
   must(await admin.from('assessments').update({ status: 'done', score: 79 }).eq('id', initial.id).select('id'));
   const draft = await start('retest_1', ['overhead_squat', 'push_up']);
   return { client, done: initial.id, draft: draft.id };

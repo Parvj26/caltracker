@@ -19,7 +19,7 @@ const uuid = (i: number) => `10000000-0000-4000-8000-${String(i).padStart(12, '0
 
 const choice = (over: Partial<CorrectiveChoice> & Pick<CorrectiveChoice, 'exerciseId' | 'name'>): CorrectiveChoice => ({
   trackingType: 'reps',
-  imagePath: null,
+  imageUrl: null,
   direction: 'under',
   muscles: [
     { muscleId: 'glute_medius', side: 'L' },
