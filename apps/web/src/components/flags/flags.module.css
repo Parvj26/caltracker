@@ -1,0 +1,155 @@
+/* Flags: the Limitations & injuries card, its list, the New flag sheet and the builder's reminder (AS9, AS10, AS1). */
+.card { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; container: flags-card / inline-size; }
+.cardHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.heading { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* The small front and back figures side by side, centred. */
+.maps { display: flex; justify-content: center; gap: var(--ct-space-2); padding-block: var(--ct-space-1); }
+
+/* ---------- The list ---------- */
+.list { display: flex; flex-direction: column; min-width: 0; }
+.rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.rows[hidden] { display: none; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2-5);
+  min-height: 60px;
+  padding-block: var(--ct-space-2);
+  border-top: var(--ct-border-width-card) solid var(--ct-border);
+}
+.number {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ct-ink);
+  color: var(--ct-bg);
+  font-size: var(--ct-size-caption);
+  font-weight: 800;
+}
+.rowText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rowHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-1) var(--ct-space-2); }
+.place { font-weight: 800; }
+.note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.rowButton { flex: none; }
+.rowResolved .place { color: var(--ct-ink-muted); }
+
+.typeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--ct-space-2-5);
+  border-radius: var(--ct-radius-pill);
+  font-size: var(--ct-size-caption);
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.type-pain { background: var(--ct-danger-bg); color: var(--ct-danger); }
+.type-injury { background: var(--ct-ink); color: var(--ct-bg); }
+.type-limitation { background: var(--ct-surface); color: var(--ct-ink); }
+
+.resolved { display: flex; flex-direction: column; }
+.resolvedToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-tap-min);
+  padding: 0;
+  border: 0;
+  border-top: var(--ct-border-width-card) solid var(--ct-border);
+  background: none;
+  color: var(--ct-ink-muted);
+  font: inherit;
+  font-size: var(--ct-size-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+.resolvedToggle:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.chevron { color: var(--ct-ink); }
+.resolvedToggle[aria-expanded='true'] .chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: no-preference) { .chevron { transition: transform 150ms ease-out; } }
+
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ct-space-2); min-height: 0; font-size: var(--ct-size-caption); font-weight: 700; }
+.status:empty { display: none; }
+.undo {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ct-tap-min);
+  min-width: var(--ct-tap-min);
+  padding: 0 var(--ct-space-1);
+  border: 0;
+  background: none;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-section-heading);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.undo:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+
+/* ---------- New flag ---------- */
+.form { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.sheetMap { display: flex; flex-direction: column; align-items: center; gap: var(--ct-space-2); }
+.sheetMap > .caption { text-align: center; }
+
+.segmentField { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }
+.segmentCompact { align-self: center; }
+.segmentLabel { font-size: var(--ct-size-body); font-weight: 700; }
+.segments {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--ct-space-1);
+  padding: var(--ct-space-1);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-surface);
+}
+.segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ct-tap-min);
+  min-height: var(--ct-tap-min);
+  padding: 0 var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  color: var(--ct-ink);
+  font-weight: var(--ct-weight-section-heading);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.segmentInput { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.segment:has(.segmentInput:checked) {
+  background: var(--ct-bg);
+  box-shadow: inset 0 0 0 var(--ct-border-width-secondary-button) var(--ct-ink);
+  font-weight: var(--ct-weight-button);
+}
+.segment:has(.segmentInput:focus-visible) { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+@media (hover: hover) { .segment:not(:has(.segmentInput:checked)):hover { background: var(--ct-bg); } }
+
+/* ---------- The builder's reminder bar ---------- */
+.reminder {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-2-5);
+  min-height: var(--ct-tap-min);
+  padding: var(--ct-space-2) var(--ct-space-3);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+  box-shadow: inset 0 0 0 2px var(--ct-amber);
+  color: var(--ct-ink);
+  font-size: var(--ct-size-body);
+  font-weight: 700;
+  text-decoration: none;
+}
+.reminder:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+@media (hover: hover) { .reminder:hover { background: color-mix(in srgb, var(--ct-amber) 10%, var(--ct-bg)); } }
+.reminderIcon, .reminderChevron { flex: none; }
+.reminderText { flex: 1; min-width: 0; overflow-wrap: anywhere; }

@@ -7,7 +7,7 @@ import { LocalDate } from '@/app/(coach)/workouts/local-date';
 import { Button, Card, ErrorText, TextAreaField, TextField } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import type { OverviewNote } from '@/lib/client-overview';
-import { addNote, clearGoal, deleteNote, saveGoal, saveLimitations, updateNote, type RecordOutcome } from '../overview-actions';
+import { addNote, clearGoal, deleteNote, saveGoal, updateNote, type RecordOutcome } from '../overview-actions';
 import styles from '../client-page.module.css';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 
@@ -110,71 +110,6 @@ export function GoalCard({
         <p className={styles.caption}>No goal yet.</p>
       )}
       <p className={styles.caption}>Shared with {firstName}.</p>
-    </Card>
-  );
-}
-
-export function LimitationsCard({ clientId, body, readOnly }: { clientId: string; body: string; readOnly: boolean }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(body);
-  const save = useSave();
-  const editButton = useRef<HTMLButtonElement>(null);
-  // Unsaved limitations: Back, links and closing the tab ask "Discard changes?" first (UI rules §8).
-  const guard = useUnsavedGuard(editing && text.trim() !== body.trim(), { message: 'The limitations you typed aren’t saved yet.' });
-  const close = () => {
-    setEditing(false);
-    requestAnimationFrame(() => editButton.current?.focus());
-  };
-  return (
-    <Card id="limitations" tabIndex={-1} className={styles.card} aria-labelledby="limitations-heading">
-      {guard.prompt}
-      <div className={styles.cardHead}>
-        <h2 id="limitations-heading" className={styles.heading}>Limitations &amp; injuries</h2>
-        {readOnly || editing ? null : (
-          <button
-            ref={editButton}
-            type="button"
-            className={styles.textButton}
-            aria-label="Edit limitations and injuries"
-            onClick={() => {
-              setText(body);
-              save.clear();
-              setEditing(true);
-            }}
-          >
-            Edit
-          </button>
-        )}
-      </div>
-      {editing ? (
-        <form
-          className={styles.editor}
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.run(() => saveLimitations(clientId, text), close);
-          }}
-        >
-          <TextAreaField
-            label="Limitations and injuries"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={NOTE_MAX_LENGTH}
-            rows={5}
-            autoFocus
-            placeholder="Left knee: no deep squats. Lower back: avoid heavy deadlifts."
-          />
-          {save.error ? <ErrorText code={save.error} /> : null}
-          <div className={styles.actions}>
-            <Button type="submit" pending={save.pending}>{save.pending ? 'Saving…' : 'Save'}</Button>
-            <Button variant="secondary" onClick={close} disabled={save.pending}>Cancel</Button>
-          </div>
-        </form>
-      ) : body.trim() ? (
-        <p className={styles.body}>{body}</p>
-      ) : (
-        <p className={styles.caption}>Nothing noted.</p>
-      )}
-      <p className={styles.caption}>Only you can see this.</p>
     </Card>
   );
 }

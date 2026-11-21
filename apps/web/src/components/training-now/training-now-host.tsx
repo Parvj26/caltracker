@@ -26,8 +26,8 @@ function SessionPaneView({ pane, units, coachId, onProgress }: { pane: SessionPa
   return (
     <div className={sessionStyles.wide}>
       <ParentBackLink href={`/clients/${pane.clientId}/training`} label={pane.name} />
-      {/* This client's injury note, on their own screen: with several people training, each tab shows its own. */}
-      <InjuryChip text={pane.injury} />
+      {/* This client's open flags, on their own screen: with several people training, each tab shows its own. */}
+      <InjuryChip flags={pane.flags} />
       <SessionLogger
         // A take-over or a new session is a different log: start the screen afresh.
         key={pane.logId}

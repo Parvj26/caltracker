@@ -8,6 +8,8 @@ import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { loadExercisePrefs } from '@/lib/workouts';
 import { requireCoach } from '@/lib/auth';
 import { getClient, getWorkoutDoc } from '@/lib/page-data';
+import { getOpenClientFlags } from '@/lib/client-flags';
+import { FlagReminder } from '@/components/flags/flag-reminder';
 import { loadProgression } from '@/lib/progression';
 import { createServerSupabase } from '@/lib/supabase/server';
 import styles from '@/components/calendar/calendar.module.css';
@@ -45,7 +47,7 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
   const exerciseIds = loaded.doc.blocks.flatMap((b) => b.exercises.map((e) => e.exerciseId));
   const progression = await loadProgression(supabase, workoutId, exerciseIds).catch(() => ({}));
   const suggestions = suggestionsForWorkout(loaded.doc, progression, units);
-  const prefs = await loadExercisePrefs(supabase, workspaceId);
+  const [prefs, flags] = await Promise.all([loadExercisePrefs(supabase, workspaceId), getOpenClientFlags(client.id)]);
 
   return (
     <div className={styles.page}>
@@ -61,6 +63,8 @@ export default async function ClientWorkoutPage({ params }: { params: Promise<{ 
         mode={{ clientName: client.name, date: loaded.scheduledOn }}
         initialPrefs={prefs}
         pageTitle
+        // The client's open flags, under the title (board AS10).
+        reminder={<FlagReminder clientId={client.id} firstName={client.firstName} flags={flags} />}
       />
     </div>
   );

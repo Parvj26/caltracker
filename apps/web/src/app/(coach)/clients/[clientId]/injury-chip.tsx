@@ -1,22 +1,23 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { injurySummary } from '@/lib/injury-summary';
+import { flagChipSummary, flagHeadline, formatPlainDayMonth, openFlagsNewestFirst, type ClientFlag } from '@caltracker/shared';
 import styles from './client-page.module.css';
 
 /**
- * An amber chip with the first line of the coach's "Limitations & injuries" note ("Left knee: no deep squats",
- * "+2 more" when there are more lines). A tap shows the whole note under it, so it can be read without leaving the
- * page (also mid-session on the logger). Nothing when no note is kept.
+ * An amber chip with the client's newest open flag ("Neck pain", "+1 more" when more are open). A tap lists every open
+ * flag under it with its note, so it can be read without leaving the page (also mid-session on the logger and in
+ * Training now). Nothing when no flag is open.
  */
-export function InjuryChip({ text }: { text: string }) {
-  const summary = injurySummary(text);
+export function InjuryChip({ flags }: { flags: readonly ClientFlag[] }) {
+  const summary = flagChipSummary(flags);
   const [open, setOpen] = useState(false);
-  const noteId = useId();
+  const listId = useId();
   if (!summary) return null;
+  const openFlags = openFlagsNewestFirst(flags);
   return (
     <div className={styles.injury} data-testid="injury-chip">
-      <button type="button" className={styles.injuryChip} aria-expanded={open} aria-controls={noteId} onClick={() => setOpen((o) => !o)}>
+      <button type="button" className={styles.injuryChip} aria-expanded={open} aria-controls={listId} onClick={() => setOpen((o) => !o)}>
         <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" className={styles.injuryIcon}>
           <path d="M12 3l10 18H2z" fill="var(--ct-amber)" stroke="var(--ct-ink)" strokeWidth="2.2" strokeLinejoin="round" />
           <path d="M12 10v5M12 18v.5" stroke="var(--ct-ink)" strokeWidth="2.4" strokeLinecap="round" />
@@ -30,9 +31,16 @@ export function InjuryChip({ text }: { text: string }) {
           <path d="M9 5l7 7-7 7" />
         </svg>
       </button>
-      <p id={noteId} className={styles.injuryNote} hidden={!open}>
-        {text.trim()}
-      </p>
+      <ul id={listId} className={styles.injuryNote} hidden={!open}>
+        {openFlags.map((f) => (
+          <li key={f.id}>
+            <strong>{flagHeadline(f)}</strong> · since {formatPlainDayMonth(f.since)}
+            {/* A pain's or injury's note follows; a limitation's first line is already its headline, so only a longer one shows in full. */}
+            {f.type !== 'limitation' && f.region !== null && f.note.trim() ? <> · “{f.note.trim()}”</> : null}
+            {(f.type === 'limitation' || f.region === null) && f.note.trim().includes('\n') ? <span className={styles.injuryFull}>{f.note.trim()}</span> : null}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -88,7 +88,7 @@ for (const { size, use } of SIZES) {
       await expect(page).toHaveURL(new RegExp(`/clients/${client.id}/limitations$`));
       await expect(page).toHaveTitle(new RegExp(`^Limitations & injuries · ${client.name} · Clients`));
 
-      // First time: Cycle 1, Initial not done yet, both retests waiting; the injuries note is still here.
+      // First time: Cycle 1, Initial not done yet, both retests waiting; the flags card (step 4) is beside it.
       const card = page.getByTestId('assessments-card');
       await expect(card.getByText('Cycle 1')).toBeVisible();
       await expect(page.getByTestId('slot-initial')).toContainText('Not done yet');

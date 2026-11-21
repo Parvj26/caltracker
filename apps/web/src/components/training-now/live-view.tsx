@@ -269,8 +269,8 @@ export function LiveView({ pane, units, joined }: { pane: WatchPane; units: Unit
       </header>
 
       <div className={cx(styles.inner, styles.innerWide, styles.body)}>
-        {/* The client's injury note, as on their Overview and the session logger. */}
-        <InjuryChip text={pane.injury} />
+        {/* The client's open flags, as on their Overview and the session logger. */}
+        <InjuryChip flags={pane.flags} />
         <div className={styles.timeline}>
           {runs.map((run) => {
             const blocks = run.blockIndexes.map((i) => ({ block: log.blocks[i]!, index: i }));

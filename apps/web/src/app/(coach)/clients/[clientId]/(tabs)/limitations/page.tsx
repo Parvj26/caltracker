@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { cycleView, observedFindings } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
-import { getClient, getClientLimitations } from '@/lib/page-data';
+import { getClient } from '@/lib/page-data';
+import { loadClientFlags } from '@/lib/client-flag-rows';
 import { clientPageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { loadAssessment, loadCycles, loadInitialKeys, loadLibrary } from '../../assessments/load';
@@ -14,8 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ clientId:
 
 /**
  * "Limitations & injuries" (board AS1): the assessment cycle card (Initial → Retest 1 → optional Retest 2, + New
- * cycle), the newest finished assessment's findings, and the coach's injuries note as it is on the Overview (flags
- * replace it in a later step).
+ * cycle), the newest finished assessment's findings, and the client's flags (the same card as on the Overview).
  */
 export default async function ClientLimitationsPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { workspaceId } = await requireCoach();
@@ -23,10 +23,10 @@ export default async function ClientLimitationsPage({ params }: { params: Promis
   const client = await getClient(clientId);
   if (!client) notFound();
   const supabase = await createServerSupabase();
-  const [cycles, library, limitations] = await Promise.all([
+  const [cycles, library, flags] = await Promise.all([
     loadCycles(supabase, workspaceId, client.id),
     loadLibrary(supabase),
-    getClientLimitations(client.id),
+    loadClientFlags(supabase, workspaceId, [client.id]),
   ]);
   const view = cycleView(cycles);
   const [latest, initialKeys] = await Promise.all([
@@ -42,7 +42,7 @@ export default async function ClientLimitationsPage({ params }: { params: Promis
       initialKeys={initialKeys}
       latest={latest ? { id: latest.id, slot: latest.slot, assessedOn: latest.assessedOn } : null}
       findings={findings}
-      limitations={limitations}
+      flags={flags.get(client.id) ?? []}
       readOnly={client.removedAt !== null}
     />
   );

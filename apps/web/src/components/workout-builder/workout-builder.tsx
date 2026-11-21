@@ -1,7 +1,7 @@
 'use client';
 
 import type { ErrorCode } from '@caltracker/shared';
-import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BUILDER_SETS,
@@ -101,6 +101,8 @@ type Props = {
   initialPrefs?: Record<string, ExercisePrefs>;
   /** Inside a sheet whose top bar has Save on every size: the bar's own Save stays in the page (the top bar presses it) but isn't shown. */
   hideWideSave?: boolean;
+  /** A client's workout: their open flags, shown under the title (FlagReminder, board AS10). */
+  reminder?: ReactNode;
 };
 
 type Picker =
@@ -202,6 +204,7 @@ export function WorkoutBuilder({
   onDirtyChange,
   embedded = false,
   hideWideSave = false,
+  reminder,
   pageTitle = false,
 }: Props) {
   const router = useRouter();
@@ -686,6 +689,7 @@ export function WorkoutBuilder({
   return (
     // data-no-menu-button: on an iPhone the tab bar would sit on the builder's own bottom bar (More, + Exercise).
     <div ref={builderRef} className={styles.builder} data-no-menu-button="" data-workout-builder="">
+      {reminder}
       {mode !== 'library' ? (
         <p className={styles.modeBanner}>
           {mode.clientName}&apos;s workout for {formatDay(mode.date)}. Changes here don&apos;t touch your library.

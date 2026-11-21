@@ -50,7 +50,7 @@ export default async function ClientOverviewPage({ params, searchParams }: { par
     <>
       {/* The Today card follows a session as it starts, moves on and finishes. */}
       {client.removedAt === null ? <LiveRefresh on={[{ table: 'workout_logs', filter: `client_id=eq.${client.id}` }]} renderedAt={renderTime()} /> : null}
-      <OverviewView data={data} units={units} coachId={userId} readOnly={client.removedAt !== null} />
+      <OverviewView data={data} clientName={client.name} units={units} coachId={userId} readOnly={client.removedAt !== null} />
     </>
   );
 }

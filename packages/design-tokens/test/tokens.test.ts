@@ -23,6 +23,14 @@ describe('colour tokens (design spec section 2)', () => {
       danger: '#B3261E',
       dangerDeep: '#8C1D18',
       dangerBg: '#FBE9E7',
+      amberDeep: '#C77E00',
+      mapSkin: '#EFEFEC',
+      mapOutline: '#C9C9C4',
+      mapRegion: '#D3D3D3',
+      mapOver: '#E5484D',
+      mapUnderBg: '#D5E3FB',
+      mapNormal: '#BFE6CB',
+      mapNormalLine: '#1E6E38',
     });
   });
 });
