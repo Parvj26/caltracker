@@ -124,6 +124,8 @@
 .measureTable { width: 100%; border-collapse: collapse; }
 .measureTable th, .measureTable td { padding: var(--ct-space-2) 0; text-align: right; font-variant-numeric: tabular-nums; border-bottom: var(--ct-border-width-card) solid var(--ct-border); }
 .measureTable th:first-child, .measureTable td:first-child { text-align: left; }
+/* The L and R columns: a gap before each value and no wrapping ("Flat  Normal", "14 cm  11 cm"). */
+.measureTable :is(th, td):not(:first-child) { padding-left: var(--ct-space-4); white-space: nowrap; }
 .measureTable thead th { font-size: var(--ct-size-caption); color: var(--ct-ink-muted); font-weight: var(--ct-weight-button); }
 .measureTable tbody tr:last-child > * { border-bottom: 0; }
 .notes { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
@@ -252,7 +254,7 @@
   .sideRows { flex-direction: row; flex-wrap: wrap; gap: var(--ct-space-4); }
 }
 .sideRow { display: flex; align-items: center; gap: var(--ct-space-2); min-width: 0; }
-.sideRow .sideLabel { width: 1em; }
+.sideRow .sideLabel { width: 1em; flex-shrink: 0; }
 
 /* Normal / Slight / Severe: Normal pre-selected as a white pill; Slight or Severe selected = ink fill (a toggle). */
 .severity { display: grid; grid-template-columns: repeat(3, minmax(56px, 1fr)); gap: 2px; padding: 2px; border-radius: var(--ct-radius-input); background: var(--ct-surface); flex: 1; max-width: 360px; }

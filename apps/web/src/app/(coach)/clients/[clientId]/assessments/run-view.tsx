@@ -379,9 +379,8 @@ function CheckpointRow({ checkpoint: c, results, onRate }: { checkpoint: Checkpo
           const name = side === 'none' ? c.label : `${c.label}, ${SIDE_WORD[side]}`;
           return (
             <div key={side} className={styles.sideRow}>
-              {side === 'none' ? null : (
-                <span className={styles.sideLabel} aria-hidden="true">{side}</span>
-              )}
+              {/* An unsided line keeps the same (empty) label column, so its control lines up with the L and R rows. */}
+              <span className={styles.sideLabel} aria-hidden="true">{side === 'none' ? '' : side}</span>
               <div className={styles.severity} role="group" aria-label={name} title={c.guide ? `Slight: ${c.guide.slight}. Severe: ${c.guide.severe}.` : undefined}>
                 {(['normal', 'slight', 'severe'] as const).map((level) => (
                   <button

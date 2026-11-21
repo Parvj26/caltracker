@@ -147,7 +147,9 @@ function failFor(
   where: string,
 ): ActionFailure {
   if (error.code === '42501') return fail('assessment_denied', where);
-  if (error.code === '23505' || (error.code === '23514' && /finish|cycle/i.test(error.message ?? ''))) return fail('assessment_order', where);
+  // Started twice (another tab, or a double tap): the slot or the cycle number is already taken.
+  if (error.code === '23505') return fail('assessment_exists', where);
+  if (error.code === '23514' && /finish|cycle/i.test(error.message ?? '')) return fail('assessment_order', where);
   if (error.code === '23514' || error.code === '22023' || error.code === '22P02') return fail('assessment_invalid', where);
   return fail(fallback, where);
 }

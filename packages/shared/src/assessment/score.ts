@@ -42,7 +42,8 @@ function points(input: ScoreInput): { got: number; max: number } | NotScored {
   return { got, max };
 }
 
-const percent = (got: number, max: number) => Math.round((got / max) * 100);
+// Multiply first: (got / max) * 100 can land just under .5 in floating point (23 of 40 → 57.49999…).
+const percent = (got: number, max: number) => Math.round((got * 100) / max);
 
 /** One test's score, or null when it doesn't count (see NotScored). */
 export function testScore(input: ScoreInput): number | null {

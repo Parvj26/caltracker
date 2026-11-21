@@ -18,6 +18,8 @@
 -- for a current client, and only while the assessment is a draft. Clients, other workspaces and anon get nothing; the
 -- client app's view of the score (step 5) will be added on purpose then. Everything runs as the caller (security
 -- invoker); the only security definer functions used are the existing tenancy helpers is_coach_of / is_client_in.
+-- Ratings, numbers, test status and scores change only through save_assessment_test / finish_assessment, which check
+-- them against the test's own definition copy: a guard trigger refuses the same writes sent straight to the tables.
 --
 -- Later steps fit beside these tables without changing them (see the PR): step 2 suspected muscles and confirmations
 -- (per assessment, muscle, side) and corrective exercises; step 3 templates (an ordered list of test keys); step 4
@@ -148,6 +150,28 @@ create index assessment_measure_results_workspace_idx on public.assessment_measu
 
 -- ---------- Rules kept by triggers (security invoker: they read only what the caller may read) ----------
 
+-- Writes that must go through the functions. save_assessment_test and finish_assessment switch this on for their own
+-- transaction (set_config(..., true)); a signed-in user writing straight to the tables (the REST API) is refused.
+-- Row deletes cascading from a parent (pg_trigger_depth() > 1) and the service role / database owner are not affected.
+create function public.assessment_write_allowed() returns boolean
+language sql stable security invoker set search_path = '' as $$
+  select current_user <> 'authenticated' or pg_trigger_depth() > 1
+    or coalesce(current_setting('caltracker.assessment_write', true), '') = 'on';
+$$;
+revoke execute on function public.assessment_write_allowed() from public, anon;
+grant execute on function public.assessment_write_allowed() to authenticated;
+
+create function public.assessment_write_guard() returns trigger
+language plpgsql security invoker set search_path = '' as $$
+begin
+  if not public.assessment_write_allowed() then
+    raise exception 'Assessments change only through their save functions.' using errcode = '42501';
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+revoke execute on function public.assessment_write_guard() from public, anon, authenticated;
+
 -- A new cycle follows the newest one, and only once that one's Retest 1 is done and nothing in it is half-done.
 create function public.assessment_cycles_before_insert() returns trigger
 language plpgsql security invoker set search_path = '' as $$
@@ -201,6 +225,9 @@ begin
     if old.status = 'done' then
       raise exception 'A finished assessment cannot change.' using errcode = '23514';
     end if;
+    if (new.status, new.score) is distinct from (old.status, old.score) and not public.assessment_write_allowed() then
+      raise exception 'Finish an assessment through finish_assessment.' using errcode = '42501';
+    end if;
     new.finished_at := case when new.status = 'done' then now() end;
     new.updated_at := now();
   end if;
@@ -235,6 +262,12 @@ create trigger assessment_tests_before_insert before insert on public.assessment
 
 create trigger assessment_tests_touch before update on public.assessment_tests
   for each row execute function public.touch_updated_at();
+create trigger assessment_tests_write_guard before update on public.assessment_tests
+  for each row execute function public.assessment_write_guard();
+create trigger assessment_checkpoint_results_write_guard before insert or delete on public.assessment_checkpoint_results
+  for each row execute function public.assessment_write_guard();
+create trigger assessment_measure_results_write_guard before insert or delete on public.assessment_measure_results
+  for each row execute function public.assessment_write_guard();
 
 -- ---------- Privileges ----------
 revoke all on table public.assessment_test_definitions, public.assessment_cycles, public.assessments,
@@ -281,7 +314,7 @@ create policy assessments_update on public.assessments for update to authenticat
   using (public.is_coach_of(workspace_id) and status = 'draft')
   with check (public.is_coach_of(workspace_id) and public.is_client_in(workspace_id, client_id));
 create policy assessments_delete on public.assessments for delete to authenticated
-  using (public.is_coach_of(workspace_id) and status = 'draft');
+  using (public.is_coach_of(workspace_id) and status = 'draft' and public.is_client_in(workspace_id, client_id));
 
 -- Tests and results: coach reads all; writes only inside a draft assessment of a current client. The subqueries run
 -- under the caller's own RLS on assessments / assessment_tests.
@@ -308,7 +341,7 @@ create policy assessment_checkpoint_results_insert on public.assessment_checkpoi
 create policy assessment_checkpoint_results_delete on public.assessment_checkpoint_results for delete to authenticated
   using (public.is_coach_of(workspace_id) and exists (select 1 from public.assessment_tests t
     join public.assessments a on a.id = t.assessment_id
-    where t.id = test_id and a.status = 'draft'));
+    where t.id = test_id and a.status = 'draft' and public.is_client_in(a.workspace_id, a.client_id)));
 
 create policy assessment_measure_results_select on public.assessment_measure_results for select to authenticated
   using (public.is_coach_of(workspace_id));
@@ -320,7 +353,7 @@ create policy assessment_measure_results_insert on public.assessment_measure_res
 create policy assessment_measure_results_delete on public.assessment_measure_results for delete to authenticated
   using (public.is_coach_of(workspace_id) and exists (select 1 from public.assessment_tests t
     join public.assessments a on a.id = t.assessment_id
-    where t.id = test_id and a.status = 'draft'));
+    where t.id = test_id and a.status = 'draft' and public.is_client_in(a.workspace_id, a.client_id)));
 
 -- ---------- Functions (security invoker: every row goes through the policies above) ----------
 
@@ -348,6 +381,9 @@ begin
   if not public.is_coach_of(p_workspace_id) or not public.is_client_in(p_workspace_id, p_client_id) then
     raise exception 'You can''t assess this client.' using errcode = '42501';
   end if;
+  -- One start at a time per client, before anything is read: two starts (a Retest 2 and "+ New cycle", say) can't
+  -- both pass the order checks against the same picture of the cycles.
+  perform pg_advisory_xact_lock(hashtextextended('assessments:' || p_workspace_id::text || ':' || p_client_id::text, 0));
   if p_test_keys is null or cardinality(p_test_keys) not between 1 and 20
     or cardinality(p_test_keys) <> (select count(distinct k) from unnest(p_test_keys) k) then
     raise exception 'Pick between 1 and 20 different tests.' using errcode = '22023';
@@ -414,6 +450,7 @@ begin
     or jsonb_array_length(p_results) > 200 or jsonb_array_length(p_measures) > 50 then
     raise exception 'The results are not valid.' using errcode = '22023';
   end if;
+  perform set_config('caltracker.assessment_write', 'on', true);
 
   update public.assessment_tests
     set status = p_status, follow_ups = coalesce(p_follow_ups, '{}'::jsonb), discomfort_left = p_discomfort_left,
@@ -455,6 +492,7 @@ begin
     select p_test_id, v_ws, r.measure_id, r.side, r.value, m.ms ->> 'unit', (m.ms ->> 'higherIsBetter')::boolean
     from jsonb_to_recordset(p_measures) as r(measure_id text, side text, value numeric)
     join lateral (select x.ms from jsonb_path_query(v_def, '$.measures[*]') as x(ms) where x.ms ->> 'id' = r.measure_id) m on true;
+  perform set_config('caltracker.assessment_write', 'off', true);
 end;
 $$;
 revoke execute on function public.save_assessment_test(uuid, text, jsonb, jsonb, jsonb, boolean, boolean, text, text, smallint) from public, anon;
@@ -468,6 +506,7 @@ begin
   if jsonb_typeof(p_scores) is distinct from 'array' then
     raise exception 'The scores are not valid.' using errcode = '22023';
   end if;
+  perform set_config('caltracker.assessment_write', 'on', true);
   update public.assessment_tests set status = 'skipped' where assessment_id = p_assessment_id and status = 'pending';
   update public.assessment_tests t set score = s.score
     from jsonb_to_recordset(p_scores) as s(test_id uuid, score smallint)
@@ -476,6 +515,7 @@ begin
   if not found then
     raise exception 'This assessment can''t be finished.' using errcode = '42501';
   end if;
+  perform set_config('caltracker.assessment_write', 'off', true);
 end;
 $$;
 revoke execute on function public.finish_assessment(uuid, jsonb, smallint) from public, anon;

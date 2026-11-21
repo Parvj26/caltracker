@@ -146,6 +146,7 @@ export const ERROR_CODES = {
   assessment_invalid: 'Check the assessment and try again.',
   assessment_denied: "You can't assess this client.",
   assessment_order: 'Finish the assessment before this one first.',
+  assessment_exists: 'This assessment was already started. Reload to see it.',
   assessment_locked: 'This assessment is finished and can no longer change.',
   assessment_start_failed: "Couldn't start the assessment. Please try again.",
   assessment_save_failed: "Couldn't save. Please try again.",

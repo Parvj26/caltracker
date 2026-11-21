@@ -1,5 +1,5 @@
 begin;
-select plan(64);
+select plan(74);
 
 -- Fixtures (as postgres): workspace A with clients a1 and a2, workspace B with client b1.
 select tests.create_user('as-coach-a@t.local', 'Coach A') as coach_a \gset
@@ -34,12 +34,15 @@ select ok(not has_column_privilege('authenticated', 'public.assessment_tests', '
 select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.prosecdef
     and p.proname in ('start_assessment', 'save_assessment_test', 'finish_assessment', 'assessments_before_write',
-      'assessment_cycles_before_insert', 'assessment_tests_before_insert')),
+      'assessment_cycles_before_insert', 'assessment_tests_before_insert', 'assessment_write_guard',
+      'assessment_write_allowed')),
   'every new function runs as the caller (no security definer)');
 select ok((select bool_and(p.proconfig @> array['search_path=""']) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname in ('start_assessment', 'save_assessment_test', 'finish_assessment')),
   'the functions pin an empty search_path');
 select is((select count(*)::int from public.assessment_test_definitions where workspace_id is null), 9, 'nine built-in tests are seeded');
+select ok((select position('pg_advisory_xact_lock' in p.prosrc) between 1 and position('assessment_cycles c' in p.prosrc)
+  from pg_proc p where p.proname = 'start_assessment'), 'start_assessment locks the client before reading the cycles');
 select ok(not has_function_privilege('anon', 'public.start_assessment(uuid, uuid, text, boolean, date, text, text, text, text[])', 'execute'),
   'anon cannot start an assessment');
 
@@ -88,6 +91,23 @@ select is((select string_agg(side || '=' || value::text || unit || '/' || higher
 select throws_ok(format($$select public.save_assessment_test(%L, 'done', '[]',
     '[{"measure_id":"shm.reach_gap","side":"L","value":61}]', '{}', false, false, '', '', null)$$, :'shm_a1'),
   '22023', null, 'a number outside the measure''s range is refused');
+-- Straight to the tables (the REST API), the same writes are refused: only the functions, which check them, may.
+select throws_ok(format($$insert into public.assessment_checkpoint_results (test_id, workspace_id, checkpoint_id, side, severity)
+  values (%L, %L, 'ohs.nope', 'L', 'severe')$$, :'ohs_a1', :'ws_a'), '42501', null, 'the coach cannot add a rating directly');
+select throws_ok(format($$insert into public.assessment_measure_results (test_id, workspace_id, measure_id, side, value, unit, higher_is_better)
+  values (%L, %L, 'shm.reach_gap', 'L', 3, 'deg', true)$$, :'shm_a1', :'ws_a'), '42501', null, 'nor a number with its own unit and direction');
+select throws_ok(format($$delete from public.assessment_checkpoint_results where test_id = %L$$, :'ohs_a1'),
+  '42501', null, 'nor delete ratings directly');
+select throws_ok(format($$delete from public.assessment_measure_results where test_id = %L$$, :'shm_a1'),
+  '42501', null, 'nor delete numbers directly');
+select throws_ok(format($$update public.assessment_tests set score = 100 where id = %L$$, :'ohs_a1'),
+  '42501', null, 'nor set a test''s score directly');
+select throws_ok(format($$update public.assessment_tests set status = 'skipped' where id = %L$$, :'ohs_a1'),
+  '42501', null, 'nor a test''s status');
+select throws_ok(format($$update public.assessments set status = 'done', score = 100 where id = %L$$, :'init_a1'),
+  '42501', null, 'nor finish an assessment directly with a score of their choosing');
+select lives_ok(format($$update public.assessments set note = 'Shoes: trainers' where id = %L$$, :'init_a1'),
+  'a draft''s note can still be changed');
 select throws_ok(format($$insert into public.assessment_tests (workspace_id, assessment_id, position, definition_id, definition)
   values (%L, %L, 9, (select id from public.assessment_test_definitions where test_key = 'push_up'), '{}')$$, :'ws_a', :'init_a1'),
   '42501', null, 'the app cannot send its own definition copy');
@@ -165,7 +185,7 @@ select is((select status from public.assessment_tests where assessment_id = :'in
 select throws_ok(format($$select public.save_assessment_test(%L, 'done', '[]', '[]', '{}', false, false, '', 'later', null)$$, :'ohs_a1'),
   '42501', null, 'a finished assessment''s tests cannot change');
 update public.assessments set note = 'later' where id = :'init_a1';
-select is((select note from public.assessments where id = :'init_a1'), '', 'nor the assessment itself');
+select is((select note from public.assessments where id = :'init_a1'), 'Shoes: trainers', 'nor the assessment itself');
 delete from public.assessments where id = :'init_a1';
 select is((select count(*)::int from public.assessments where id = :'init_a1'), 1, 'a finished assessment cannot be deleted');
 
@@ -181,8 +201,13 @@ select is((select c.number from public.assessments a join public.assessment_cycl
   'a new cycle is cycle 2');
 select throws_ok(format($$select public.start_assessment(%L, %L, 'retest_2', false, current_date, null, null, '', array['push_up'])$$,
   :'ws_a', :'a1'), '23514', null, 'an older cycle takes no more assessments');
+select id as pu_c2 from public.assessment_tests where assessment_id = :'c2_a1' \gset
+select public.save_assessment_test(:'pu_c2', 'done', '[{"checkpoint_id":"pu.lumbar_sag","side":"none","severity":"slight"}]',
+  '[]', '{}', false, false, 'Floor', '', 50::smallint);
 select lives_ok(format($$delete from public.assessments where id = %L$$, :'c2_a1'), 'a draft can be deleted');
-select is((select count(*)::int from public.assessments where id = :'c2_a1'), 0, 'the draft is gone');
+select is((select count(*)::int from public.assessments where id = :'c2_a1')
+  + (select count(*)::int from public.assessment_checkpoint_results where test_id = :'pu_c2'), 0,
+  'the draft is gone, with its ratings');
 select throws_ok(format($$insert into public.assessment_cycles (workspace_id, client_id, number) values (%L, %L, 5)$$, :'ws_a', :'a1'),
   '23514', null, 'cycles are numbered one after another');
 reset role;
@@ -199,6 +224,8 @@ select throws_ok(format($$select public.save_assessment_test(%L, 'done', '[]', '
   '42501', null, 'but cannot save into it');
 select throws_ok(format($$select public.start_assessment(%L, %L, 'initial', true, current_date, null, null, '', array['push_up'])$$,
   :'ws_a', :'a2'), '42501', null, 'nor start a new one');
+delete from public.assessments where id = :'init_a2';
+select is((select count(*)::int from public.assessments where id = :'init_a2'), 1, 'nor delete the removed client''s draft');
 reset role;
 
 select * from finish();

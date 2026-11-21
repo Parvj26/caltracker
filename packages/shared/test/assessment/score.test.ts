@@ -132,6 +132,26 @@ describe('movementScore', () => {
   });
 });
 
+describe('rounding', () => {
+  it('rounds halves up, without floating-point drift (23 of 40 = 57.5 → 58)', () => {
+    // 10 sided checkpoints = 20 lines = 40 points; 17 lines Slight (1 point each) + 3 Normal (2 each) = 23 of 40.
+    const many: TestDefinition = {
+      ...def('r'),
+      views: [
+        {
+          id: 'front',
+          label: 'Front',
+          watch: '',
+          groups: [{ label: 'All', checkpoints: Array.from({ length: 10 }, (_, i) => ({ id: `r.c${i}`, label: `C${i}`, sided: true })) }],
+        },
+      ],
+    };
+    const results = Array.from({ length: 17 }, (_, i) => r(`r.c${Math.floor(i / 2)}`, i % 2 === 0 ? 'L' : 'R', 'slight'));
+    expect(testScore({ definition: many, status: 'done', results })).toBe(58);
+    expect(movementScore([{ definition: many, status: 'done', results }]).overall).toBe(58);
+  });
+});
+
 describe('scoreBand', () => {
   it('maps 0–49 Needs work, 50–69 Fair, 70–84 Good, 85–100 Great', () => {
     expect([0, 49, 50, 69, 70, 84, 85, 100].map((n) => scoreBand(n).label)).toEqual([

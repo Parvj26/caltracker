@@ -1,3 +1,4 @@
+import { addDays } from '../dates/dates';
 import type { AssessmentSlot } from './types';
 
 /**
@@ -50,11 +51,6 @@ export type CycleView = {
   latestDone: AssessmentSummary | null;
 };
 
-export function addDays(isoDate: string, days: number): string {
-  const d = new Date(`${isoDate}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 function slotsOf(cycle: CycleSummary | null): SlotState[] {
   const find = (slot: AssessmentSlot) => cycle?.assessments.find((a) => a.slot === slot) ?? null;
