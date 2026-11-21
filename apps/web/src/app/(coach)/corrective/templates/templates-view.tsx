@@ -63,7 +63,6 @@ export function TemplatesView({
             end={<ChevronIcon direction="right" size={18} />}
             current={!phone && open === t.id}
             onOpen={() => setSelected(t.id)}
-            openLabel={`Edit ${t.name}`}
             itemProps={{ 'data-testid': 'template-row' }}
           />
         ))}
