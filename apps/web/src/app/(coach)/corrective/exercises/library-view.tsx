@@ -146,7 +146,6 @@ export function CorrectiveLibrary({
                       <ListRow
                         key={item.key}
                         onOpen={() => open(item)}
-                        openLabel={`${item.name}${item.yours ? ', yours' : ''}, ${doseText(item.dose)}`}
                         current={wide && current?.key === item.key}
                         leading={<Thumb item={item} />}
                         title={

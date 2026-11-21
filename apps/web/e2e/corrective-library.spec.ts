@@ -33,6 +33,8 @@ async function shot(page: Page, name: string, fullPage = false) {
 }
 
 async function audit(page: Page, size: Size, scope?: string) {
+  // Pop-ups open with a light scale: measure them once it has settled.
+  if (scope) await page.waitForTimeout(400);
   const allow = scope ? [] : [{ i: 0, rule: 'logo' }];
   const result = await page.evaluate(auditInPage, { minTarget: size === 'desktop' ? 24 : 44, allow, ...(scope ? { scope } : {}) });
   expect(result.found.map((f) => `${f.rule}: ${f.detail}`)).toEqual([]);
@@ -102,11 +104,14 @@ for (const { size, use } of SIZES) {
       await dialog.getByRole('button', { name: 'Save' }).click();
       await expect(dialog).toBeHidden({ timeout: 20_000 });
 
-      const row = glute.getByRole('button', { name: new RegExp(`^${name}, yours, 2 × 5 each side`) });
+      const row = glute.getByRole('button', { name: new RegExp(`^${name} Yours 2 × 5 each side`) });
       await expect(row).toBeVisible();
       // Yours come first in the group.
-      await expect(glute.getByRole('listitem').first()).toContainText(name);
-      await expect(glute.getByRole('listitem').first().locator('img')).toHaveCount(1);
+      const texts = await glute.getByRole('listitem').allTextContents();
+      const mineAt = texts.findIndex((t) => t.includes(name));
+      expect(mineAt).toBeGreaterThanOrEqual(0);
+      expect(mineAt).toBeLessThan(texts.findIndex((t) => /Banded Lateral Walk/i.test(t)));
+      await expect(glute.getByRole('listitem').filter({ hasText: name }).locator('img')).toHaveCount(1);
       const saved = await admin.from('corrective_exercises').select('id, exercise_id, direction, default_sets, default_reps, each_side, corrective_exercise_muscles(muscle_id, side)').eq('workspace_id', workspaceId).eq('exercise_id', (await admin.from('exercises').select('id').eq('name', name).single()).data!.id).single();
       expect(saved.data).toMatchObject({ direction: 'under', default_sets: 2, default_reps: 5, each_side: true });
       expect(saved.data!.corrective_exercise_muscles).toHaveLength(2);
@@ -131,7 +136,7 @@ for (const { size, use } of SIZES) {
       await edit.getByLabel('Reps (optional)').fill('8');
       await edit.getByRole('button', { name: 'Save' }).click();
       await expect(edit).toBeHidden({ timeout: 20_000 });
-      await expect(glute.getByRole('button', { name: new RegExp(`^${name}, yours, 2 × 8 each side`) })).toBeVisible();
+      await expect(glute.getByRole('button', { name: new RegExp(`^${name} Yours 2 × 8 each side`) })).toBeVisible();
 
       // The exercise page: the start photo is there; add the end photo.
       await page.goto(`/exercises/${exerciseId}`);
@@ -155,7 +160,7 @@ for (const { size, use } of SIZES) {
 
       // Back in the library, the photo shows on the row; delete the corrective tag (the exercise stays).
       await page.goto('/corrective/exercises');
-      const mine = glute.getByRole('button', { name: new RegExp(`^${name}, yours`) });
+      const mine = glute.getByRole('button', { name: new RegExp(`^${name} Yours`) });
       await expect(glute.getByRole('listitem').filter({ hasText: name }).locator('img')).toHaveCount(1);
       await mine.click();
       if (size === 'desktop') {
