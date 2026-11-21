@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { isMuscleId } from '@caltracker/shared';
 import { requireCoach } from '@/lib/auth';
+import { LibraryTabs } from '../../library-tabs';
+import { CorrectiveTabs } from '../corrective-tabs';
 import { CorrectiveLibrary } from './library-view';
 import { loadCorrectiveLibrary } from './load';
 
@@ -23,6 +25,12 @@ export default async function CorrectiveExercisesPage({ searchParams }: { search
       builtins={builtins}
       initialShow={show === 'under' || show === 'over' || show === 'yours' ? show : 'all'}
       initialMuscle={isMuscleId(muscle) ? muscle : null}
+      tabs={
+        <>
+          <LibraryTabs current="/corrective" />
+          <CorrectiveTabs current="/corrective/exercises" />
+        </>
+      }
     />
   );
 }

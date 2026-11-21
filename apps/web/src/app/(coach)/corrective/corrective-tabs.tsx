@@ -3,10 +3,13 @@ import { cx } from '@/components/ui/cx';
 import styles from './templates/templates.module.css';
 
 /**
- * Library › Corrective's own sections (AS8, AS11). Step 2 adds `{ href: '/corrective', label: 'Exercises' }` first; with
- * one section there is nothing to switch, so the row stays hidden.
+ * Library › Corrective's own sections (AS8, AS11): the corrective exercises first, then the assessment templates. With
+ * one section there would be nothing to switch, so the row stays hidden.
  */
-const SECTIONS: readonly { href: string; label: string }[] = [{ href: '/corrective/templates', label: 'Templates' }];
+const SECTIONS: readonly { href: string; label: string }[] = [
+  { href: '/corrective/exercises', label: 'Exercises' },
+  { href: '/corrective/templates', label: 'Templates' },
+];
 
 export function CorrectiveTabs({ current }: { current: string }) {
   if (SECTIONS.length < 2) return null;

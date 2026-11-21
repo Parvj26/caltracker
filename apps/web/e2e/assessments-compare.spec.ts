@@ -79,7 +79,10 @@ for (const { size, use } of SIZES) {
       await signInAsCoach(page);
 
       // ---- Library › Corrective › Templates (AS11): make a template ----
+      // Library › Corrective lands on Exercises (AS8); Templates is the next section.
       await page.goto('/corrective');
+      await expect(page).toHaveURL(/\/corrective\/exercises$/);
+      await page.getByRole('navigation', { name: 'Corrective sections' }).getByRole('link', { name: 'Templates' }).click();
       await expect(page).toHaveURL(/\/corrective\/templates$/);
       await expect(page.getByRole('heading', { level: 1, name: 'Corrective' })).toBeVisible();
       await expect(page.getByRole('navigation', { name: 'Library sections' }).getByRole('link', { name: 'Corrective' })).toHaveAttribute('aria-current', 'page');

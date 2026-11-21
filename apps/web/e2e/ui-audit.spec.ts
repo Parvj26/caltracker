@@ -73,6 +73,7 @@ const GROUPS: Group[] = [
       { name: 'Exercise', path: '/exercises/:exercise' },
       { name: 'Programs', path: '/programs' },
       { name: 'Program', path: '/programs/:program' },
+      { name: 'Corrective exercises', path: '/corrective/exercises' },
       { name: 'Meals', path: '/meals' },
     ],
   },

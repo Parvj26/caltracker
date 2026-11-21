@@ -56,8 +56,12 @@ for (const { size, use } of SIZES) {
       });
 
       await signInAsCoach(page);
-      await page.goto('/corrective/exercises');
+      // Library › Corrective lands on Exercises.
+      await page.goto('/corrective');
+      await expect(page).toHaveURL(/\/corrective\/exercises$/);
       await expect(page.getByRole('heading', { level: 1, name: /^Corrective/ })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Library sections' }).getByRole('link', { name: 'Corrective' })).toHaveAttribute('aria-current', 'page');
+      await expect(page.getByRole('navigation', { name: 'Corrective sections' }).getByRole('link', { name: 'Exercises' })).toHaveAttribute('aria-current', 'page');
       // The built-in defaults are there, grouped by muscle (Glute medius, underactive).
       const glute = page.getByRole('region', { name: 'Glute medius, underactive' });
       await expect(glute.getByRole('button', { name: /^Banded Lateral Walk/i })).toBeVisible();

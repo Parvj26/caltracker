@@ -1,10 +1,6 @@
 import { redirect } from 'next/navigation';
-import { TEMPLATES_HREF } from '../clients/[clientId]/assessments/links';
 
-/**
- * Library › Corrective. For now it holds the assessment templates (AS11); step 2 adds the corrective exercises (AS8)
- * here, as the first sub-tab (corrective-tabs.tsx), and this page becomes that list.
- */
+/** Library › Corrective lands on its first section, the corrective exercises (AS8); Templates (AS11) is next to it. */
 export default function CorrectivePage() {
-  redirect(TEMPLATES_HREF);
+  redirect('/corrective/exercises');
 }
