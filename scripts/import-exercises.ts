@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { loadExtras } from './caltracker-extras';
+import { OWN_IMAGES_DIR, loadOwnImages, ownImageFiles, ownImageObjectPaths } from './caltracker-exercise-images';
 import { loadManifest, processExerciseImage, verifySha256, type ImageManifest, type ManifestImage } from './exercise-images';
 import {
   LIBRARY_TRACKING_TYPES,
@@ -34,6 +35,9 @@ export interface ImportOptions {
   extrasFile?: string;
   /** Override of the picture manifest (tests). */
   manifestFile?: string;
+  /** Override of CalTracker's own pictures table and folder (tests). */
+  ownImagesFile?: string;
+  ownImagesDir?: string;
   log?: (line: string) => void;
 }
 
@@ -43,6 +47,9 @@ export interface ImportSummary {
   imagesUploaded: number;
   imagesSkipped: number;
   imagesFailed: number;
+  /** CalTracker's own pictures (each counts its picture and thumbnail together). */
+  ownImagesUploaded: number;
+  ownImagesSkipped: number;
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -128,11 +135,31 @@ export async function importExercises(admin: Admin, opts: ImportOptions = {}): P
   }
   for (const e of extras) pictures.set(e.id, picturesFor(manifest, e.id, available));
 
+  // CalTracker's own pictures (committed under exercise-images/caltracker/) for exercises with no source photo.
+  const own = await loadOwnImages(opts.ownImagesFile);
+  const ownPaths = new Map<string, string[]>();
+  for (const [id, entry] of Object.entries(own.exercises)) {
+    if (!pictures.has(id)) {
+      if (id.includes(':')) throw new Error(`Own pictures for unknown exercise ${id}`);
+      continue; // a free-exercise-db exercise that is not part of this import (fixture subsets)
+    }
+    if (pictures.get(id)!.length > 0) throw new Error(`${id} has both its own pictures and free-exercise-db pictures`);
+    ownPaths.set(id, ownImageObjectPaths(entry));
+  }
+
   // 3. Upload each source picture once (several exercises can share one): checked against its pinned sha256, then
   //    stored as a WebP of at most 1600 px plus a 320 px thumbnail. Pictures already in the bucket are skipped.
   const sources = new Map<string, ManifestImage>();
   for (const imgs of pictures.values()) for (const img of imgs) sources.set(img.path, img);
-  const summary: ImportSummary = { exercises: list.length, extras: extras.length, imagesUploaded: 0, imagesSkipped: 0, imagesFailed: 0 };
+  const summary: ImportSummary = {
+    exercises: list.length,
+    extras: extras.length,
+    imagesUploaded: 0,
+    imagesSkipped: 0,
+    imagesFailed: 0,
+    ownImagesUploaded: 0,
+    ownImagesSkipped: 0,
+  };
   const failed = new Set<string>();
   const bucket = admin.storage.from(BUCKET);
   const exists = async (objectPath: string) => (await fetch(bucket.getPublicUrl(objectPath).data.publicUrl, { method: 'HEAD' })).ok;
@@ -169,8 +196,40 @@ export async function importExercises(admin: Admin, opts: ImportOptions = {}): P
     if (done % 100 === 0 || done === sources.size) log(`Images ${done}/${sources.size}`);
   });
 
+  // 3b. Upload CalTracker's own pictures as committed (already WebP + thumbnail). Only files that are missing in the
+  //     bucket or differ in size from the committed file are uploaded, so a re-run uploads nothing and a redrawn
+  //     picture replaces the old one.
+  const ownFailed = new Set<string>();
+  const sameSize = async (objectPath: string, size: number) => {
+    const res = await fetch(bucket.getPublicUrl(objectPath).data.publicUrl, { method: 'HEAD' });
+    return res.ok && Number(res.headers.get('content-length')) === size;
+  };
+  await runPool([...ownPaths.values()].flat(), IMAGE_CONCURRENCY, async (objectPath) => {
+    try {
+      const files = await Promise.all(
+        ownImageFiles(objectPath, opts.ownImagesDir ?? OWN_IMAGES_DIR).map(async ([p, file]) => [p, await readFile(file)] as const),
+      );
+      const stale = [];
+      for (const [p, body] of files) if (!(await sameSize(p, body.length))) stale.push([p, body] as const);
+      for (const [p, body] of stale) {
+        const { error } = await bucket.upload(p, body, { contentType: 'image/webp', upsert: true });
+        if (error) throw error;
+      }
+      if (stale.length > 0) summary.ownImagesUploaded++;
+      else summary.ownImagesSkipped++;
+    } catch (e) {
+      summary.imagesFailed++;
+      ownFailed.add(objectPath);
+      log(`FAILED own image ${objectPath}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  });
+  if (ownPaths.size > 0) {
+    log(`Own pictures: uploaded ${summary.ownImagesUploaded}, already there ${summary.ownImagesSkipped}`);
+  }
+
   // 4. Upsert exercises by external_id, pointing only at pictures that are in the bucket.
   const imagePaths = (id: string) =>
+    ownPaths.get(id)?.filter((p) => !ownFailed.has(p)) ??
     (pictures.get(id) ?? []).filter((i) => !failed.has(i.path)).map((i) => exerciseImageObjectPath(i.path));
   const rows = list.map((e) => ({ ...mapFreeExercise(e, overrides), image_paths: imagePaths(e.id) }));
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
