@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useRef, useState } from 'react';
-import { FOOT_ARCHES, SLOT_LABELS, checkpointsOf, smartFilter, type AssessmentSlot, type FootArch } from '@caltracker/shared';
+import { FOOT_ARCHES, SLOT_LABELS, checkpointsOf, resolveTemplate, smartFilter, type AssessmentSlot, type FootArch } from '@caltracker/shared';
 import { ReloadButton } from '@/components/reload-button';
 import { AdaptiveDialog, Button, ErrorText, SearchBox, SearchEmpty, TextAreaField, type AdaptiveDialogHandle } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
@@ -10,7 +11,8 @@ import type { ErrorCode } from '@caltracker/shared';
 import { useLocalToday } from '@/lib/local-today';
 import calendar from '@/components/calendar/calendar.module.css';
 import { startAssessment } from './actions';
-import type { LibraryTest } from './load';
+import { TEMPLATES_HREF } from './links';
+import type { AssessmentTemplate, LibraryTest } from './load';
 import { EyeIcon, TestIcon } from './parts';
 import styles from './assessments.module.css';
 
@@ -18,8 +20,9 @@ const ARCH_LABELS: Record<FootArch, string> = { flat: 'Flat', normal: 'Normal', 
 
 /**
  * "Start an assessment" (AS2): pick tests from the library (smart search), then "Before the tests" (foot arch L and R,
- * shoes on, and a note), then Start. A retest starts from the Initial's tests ("as Initial") so Compare lines up; the
- * coach can still add or drop one. Templates come in a later step. A bottom sheet on a phone (full screen), a centred
+ * shoes on, and a note), then Start. A retest starts from the Initial's tests ("Same as Initial") so Compare lines up;
+ * the coach can still add or drop one. A template chip (AS11) fills the list in the template's order; a test of the
+ * template no longer in the library is left out, and the dialog says so. A bottom sheet on a phone (full screen), a centred
  * dialog on iPad and desktop; the second step is an inline step with Back (never a second pop-up).
  */
 export function StartDialog({
@@ -27,6 +30,7 @@ export function StartDialog({
   slot,
   newCycle,
   library,
+  templates = [],
   defaultKeys,
   onClose,
 }: {
@@ -34,6 +38,7 @@ export function StartDialog({
   slot: AssessmentSlot;
   newCycle: boolean;
   library: LibraryTest[];
+  templates?: AssessmentTemplate[];
   defaultKeys: string[];
   onClose: () => void;
 }) {
@@ -42,7 +47,13 @@ export function StartDialog({
   const dialogRef = useRef<AdaptiveDialogHandle>(null);
   const noteId = useId();
   const [step, setStep] = useState<'pick' | 'before'>('pick');
-  const [picked, setPicked] = useState<string[]>(() => defaultKeys.filter((k) => library.some((t) => t.key === k)));
+  const libraryKeys = library.map((t) => t.key);
+  const sameAsInitial = slot !== 'initial' && defaultKeys.length > 0;
+  const [picked, setPicked] = useState<string[]>(() => resolveTemplate(defaultKeys, libraryKeys).keys);
+  // Where the list came from: "Same as Initial", a template (its id), or the coach's own picks. Its order is kept.
+  const [source, setSource] = useState<string | null>(sameAsInitial ? 'initial' : null);
+  const [base, setBase] = useState<string[] | null>(() => (sameAsInitial ? resolveTemplate(defaultKeys, libraryKeys).keys : null));
+  const [missing, setMissing] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [archL, setArchL] = useState<FootArch>('normal');
@@ -54,11 +65,21 @@ export function StartDialog({
   const asInitial = new Set(defaultKeys);
   const shown = smartFilter(library, query, (t) => t.definition.name);
   const dirty = picked.join() !== defaultKeys.join() || note.trim() !== '' || step === 'before';
-  // In library order, so the run goes the way the boards list them.
-  const ordered = library.map((t) => t.key).filter((k) => picked.includes(k));
+  // A template's (or the Initial's) order, then anything added in library order; with no template, library order, so
+  // the run goes the way the boards list them.
+  const ordered = [...(base ?? []).filter((k) => picked.includes(k)), ...libraryKeys.filter((k) => picked.includes(k) && !(base ?? []).includes(k))];
 
   function toggle(key: string) {
     setPicked((p) => (p.includes(key) ? p.filter((k) => k !== key) : [...p, key]));
+  }
+
+  function choose(id: string) {
+    const keys = id === 'initial' ? defaultKeys : (templates.find((t) => t.id === id)?.testKeys ?? []);
+    const resolved = resolveTemplate(keys, libraryKeys);
+    setSource(id);
+    setBase(resolved.keys);
+    setPicked(resolved.keys);
+    setMissing(resolved.missing);
   }
 
   async function start() {
@@ -123,6 +144,30 @@ export function StartDialog({
     >
       {step === 'pick' ? (
         <div className={styles.pickWrap}>
+          <div className={styles.templateRow} role="group" aria-labelledby="template-kicker">
+            <p id="template-kicker" className={styles.kicker}>Template</p>
+            <div className={styles.templateChips}>
+              {sameAsInitial ? (
+                <button type="button" className={styles.templateChip} aria-pressed={source === 'initial'} onClick={() => choose('initial')} data-ph-safe="">
+                  Same as Initial
+                </button>
+              ) : null}
+              {templates.map((t) => (
+                <button key={t.id} type="button" className={styles.templateChip} aria-pressed={source === t.id} onClick={() => choose(t.id)}>
+                  {t.name}
+                </button>
+              ))}
+              <Link href={TEMPLATES_HREF} className={styles.manageLink} data-ph-safe="">
+                {templates.length === 0 ? 'Make a template' : 'Manage'}
+              </Link>
+            </div>
+            {missing.length > 0 ? (
+              <p className={styles.caption} role="status">
+                {missing.length === 1 ? '1 test in this template is' : `${missing.length} tests in this template are`} no longer in the library, so
+                {missing.length === 1 ? ' it was' : ' they were'} left out.
+              </p>
+            ) : null}
+          </div>
           <SearchBox value={query} onChange={setQuery} label="Search tests" />
           {shown.length === 0 ? <SearchEmpty things="tests" query={query} onClear={() => setQuery('')} /> : null}
           <ul className={styles.pickList} aria-label="Tests">
@@ -142,6 +187,7 @@ export function StartDialog({
                         <span className={styles.pickSummary} data-ph-safe="">
                           {t.definition.summary}
                           {slot !== 'initial' && asInitial.has(t.key) ? ' · as Initial' : ''}
+                          {on && base && base.length > 1 && base.includes(t.key) && source !== 'initial' ? ` · test ${ordered.indexOf(t.key) + 1}` : ''}
                         </span>
                       </span>
                     </label>

@@ -2,6 +2,7 @@ import {
   BUILTIN_TEST_KEYS,
   type AssessmentSlot,
   type CheckpointResult,
+  type CompareMeasure,
   type CycleSummary,
   type FootArch,
   type MeasureResult,
@@ -72,11 +73,14 @@ export type AssessmentTest = {
   definition: TestDefinition;
   entry: TestEntry;
   score: number | null;
+  /** The numbers with the unit and direction stored beside them (Compare reads changes with these). */
+  measures: CompareMeasure[];
 };
 
 export type AssessmentDetail = {
   id: string;
   clientId: string;
+  cycleId: string;
   cycleNumber: number;
   slot: AssessmentSlot;
   status: 'draft' | 'done';
@@ -85,6 +89,8 @@ export type AssessmentDetail = {
   footArchRight: FootArch | null;
   note: string;
   score: number | null;
+  /** Who did it ("Luis Bueno"), or null when that coach's account is gone. */
+  coachName: string | null;
   tests: AssessmentTest[];
 };
 
@@ -93,11 +99,11 @@ export async function loadAssessment(supabase: Supabase, workspaceId: string, cl
   const { data, error } = await supabase
     .from('assessments')
     .select(
-      `id, client_id, slot, status, assessed_on, foot_arch_left, foot_arch_right, note, score,
+      `id, client_id, slot, status, assessed_on, foot_arch_left, foot_arch_right, note, score, coach_id, cycle_id,
        assessment_cycles (number),
        assessment_tests (id, position, test_key, definition, status, discomfort_left, discomfort_right, type_done, note, follow_ups, score,
          assessment_checkpoint_results (checkpoint_id, side, severity),
-         assessment_measure_results (measure_id, side, value))`,
+         assessment_measure_results (measure_id, side, value, unit, higher_is_better))`,
     )
     .eq('id', assessmentId)
     .eq('workspace_id', workspaceId)
@@ -112,6 +118,15 @@ export async function loadAssessment(supabase: Supabase, workspaceId: string, cl
       key: t.test_key,
       definition: t.definition as unknown as TestDefinition,
       score: t.score,
+      measures: t.assessment_measure_results.map(
+        (m): CompareMeasure => ({
+          measureId: m.measure_id,
+          side: m.side as Side,
+          value: Number(m.value),
+          unit: m.unit as CompareMeasure['unit'],
+          higherIsBetter: m.higher_is_better,
+        }),
+      ),
       entry: {
         status: t.status as TestStatus,
         results: t.assessment_checkpoint_results.map(
@@ -128,6 +143,7 @@ export async function loadAssessment(supabase: Supabase, workspaceId: string, cl
   return {
     id: data.id,
     clientId: data.client_id,
+    cycleId: data.cycle_id,
     cycleNumber: data.assessment_cycles?.number ?? 1,
     slot: data.slot as AssessmentSlot,
     status: data.status as 'draft' | 'done',
@@ -136,8 +152,50 @@ export async function loadAssessment(supabase: Supabase, workspaceId: string, cl
     footArchRight: data.foot_arch_right as FootArch | null,
     note: data.note,
     score: data.score,
+    coachName: data.coach_id ? await coachName(supabase, data.coach_id) : null,
     tests,
   };
+}
+
+async function coachName(supabase: Supabase, userId: string): Promise<string | null> {
+  const { data } = await supabase.from('profiles').select('first_name, last_name').eq('id', userId).maybeSingle();
+  const name = data ? `${data.first_name} ${data.last_name}`.trim() : '';
+  return name || null;
+}
+
+/** A cycle with its finished assessments in slot order, for Compare; null when it isn't this client's. */
+export async function loadCycleForCompare(
+  supabase: Supabase,
+  workspaceId: string,
+  clientId: string,
+  cycleId: string,
+): Promise<{ id: string; number: number; isNewest: boolean; done: AssessmentDetail[]; summaries: CycleSummary['assessments'] } | null> {
+  const cycles = await loadCycles(supabase, workspaceId, clientId);
+  const cycle = cycles.find((c) => c.id === cycleId);
+  if (!cycle) return null;
+  const order = ['initial', 'retest_1', 'retest_2'];
+  const done = cycle.assessments.filter((a) => a.status === 'done').sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
+  const details = await Promise.all(done.map((a) => loadAssessment(supabase, workspaceId, clientId, a.id)));
+  return {
+    id: cycle.id,
+    number: cycle.number,
+    isNewest: cycles.every((c) => c.number <= cycle.number),
+    done: details.filter((d): d is AssessmentDetail => d !== null),
+    summaries: cycle.assessments,
+  };
+}
+
+export type AssessmentTemplate = { id: string; name: string; testKeys: string[] };
+
+/** The workspace's assessment templates (AS11), by name. */
+export async function loadTemplates(supabase: Supabase, workspaceId: string): Promise<AssessmentTemplate[]> {
+  const { data, error } = await supabase
+    .from('assessment_templates')
+    .select('id, name, test_keys')
+    .eq('workspace_id', workspaceId)
+    .order('name');
+  if (error) throw new Error(`Could not load templates: ${error.message}`);
+  return data.map((t) => ({ id: t.id, name: t.name, testKeys: t.test_keys }));
 }
 
 /** The test keys of a cycle's Initial, in order: retests start from "Same as Initial". */
