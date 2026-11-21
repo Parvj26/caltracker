@@ -72,11 +72,16 @@ export function LimitationsView({
               </Link>
               <p className={styles.kicker}>Observed</p>
               <FindingsList findings={findings} {...(phone ? { limit: 3 } : {})} moreHref={assessmentHref(client.id, latest.id)} />
-              {/* Step 2 adds "Suggested workout" (and the body map) here. */}
               <div className={styles.cardActions}>
                 <ButtonLink href={assessmentHref(client.id, latest.id)} variant="secondary" size="compact" phSafe>
                   Report
                 </ButtonLink>
+                {/* Step 2: the confirmed muscles' exercises and the suggested corrective workout (AS5, AS5b). */}
+                {!readOnly ? (
+                  <ButtonLink href={`${assessmentHref(client.id, latest.id)}/exercises`} variant="secondary" size="compact" phSafe>
+                    Suggested workout
+                  </ButtonLink>
+                ) : null}
               </div>
             </Card>
           ) : null}

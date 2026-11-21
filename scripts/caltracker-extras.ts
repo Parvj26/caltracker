@@ -25,9 +25,12 @@ export const EQUIPMENT = new Set([
 ]);
 
 /** Throws a clear error on the first problem found. Pure; no I/O. */
-export function validateExtras(list: unknown, freeIds: Iterable<string> = []): ExtraExercise[] {
+export function validateExtras(list: unknown, freeIds: Iterable<string> = [], freeNames: Iterable<string> = []): ExtraExercise[] {
   if (!Array.isArray(list)) throw new Error('Extra exercises file must be a JSON array');
   const free = new Set(freeIds);
+  // A name free-exercise-db already has (any case) would make two built-ins look the same, and a by-name lookup
+  // (the corrective defaults) could find the wrong one.
+  const freeNameSet = new Set([...freeNames].map((n) => n.toLowerCase()));
   const seenIds = new Set<string>();
   const seenNames = new Set<string>();
   for (const raw of list as Partial<ExtraExercise>[]) {
@@ -44,6 +47,7 @@ export function validateExtras(list: unknown, freeIds: Iterable<string> = []): E
     if (typeof raw.name !== 'string' || raw.name.trim() === '') fail('missing name');
     const name = raw.name!.toLowerCase();
     if (seenNames.has(name)) fail('duplicate name');
+    if (freeNameSet.has(name)) fail('name clashes with a free-exercise-db name');
     seenNames.add(name);
     if (!(LIBRARY_TRACKING_TYPES as readonly string[]).includes(String(raw.trackingType))) fail(`bad tracking type ${String(raw.trackingType)}`);
     if (!CATEGORIES.has(String(raw.category))) fail(`unknown category ${String(raw.category)}`);
@@ -62,7 +66,7 @@ export function validateExtras(list: unknown, freeIds: Iterable<string> = []): E
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-export async function loadExtras(freeIds: Iterable<string>, file?: string): Promise<ExtraExercise[]> {
+export async function loadExtras(freeIds: Iterable<string>, file?: string, freeNames: Iterable<string> = []): Promise<ExtraExercise[]> {
   const raw: unknown = JSON.parse(await readFile(file ?? path.join(here, 'caltracker-extra-exercises.json'), 'utf8'));
-  return validateExtras(raw, freeIds);
+  return validateExtras(raw, freeIds, freeNames);
 }

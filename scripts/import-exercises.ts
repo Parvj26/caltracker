@@ -122,7 +122,7 @@ export async function importExercises(admin: Admin, opts: ImportOptions = {}): P
 
   // 2. Build every row before writing anything. CalTracker's extras are validated here too.
   const overrides = await loadOverrides();
-  const extras = await loadExtras(list.map((e) => e.id), opts.extrasFile);
+  const extras = await loadExtras(list.map((e) => e.id), opts.extrasFile, list.map((e) => e.name));
   const available = new Set(list.map((e) => e.id));
   const pictures = new Map<string, ManifestImage[]>();
   for (const e of list) {

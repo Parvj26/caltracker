@@ -437,3 +437,7 @@
   .barTrack { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .band, .sevChip, .changeChip, .deltaChip { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
+
+/* ---------- Step 2 in the report and Compare (step2-slots.tsx) ---------- */
+.compareMaps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--ct-space-4); }
+.compareMap { display: flex; flex-direction: column; align-items: center; gap: var(--ct-space-2); min-width: 0; }

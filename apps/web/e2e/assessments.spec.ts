@@ -5,7 +5,8 @@ import { demoWorkspace, freshClient } from './assign-helpers';
 import { serviceClient, signInAsCoach } from './helpers';
 
 // Movement assessments, step 1 (boards AS1, AS2, AS3, AS6): the "Limitations & injuries" tab, starting an Initial,
-// running tests with Normal / Slight / Severe per side, finishing with the Movement score, and picking a draft up
+// running tests with Normal / Slight / Severe per side, finishing (through step 2's Findings and Exercises) with the
+// Movement score, and picking a draft up
 // again. At phone (touch), iPad (touch) and desktop sizes. Each test makes its own client.
 // ASSESS_SHOTS=<dir> also saves screenshots there, to compare with the boards.
 
@@ -66,6 +67,14 @@ async function startInitial(page: Page, tests: string[], size: string) {
   await shot(page, `${size}-AS2-before-the-tests`);
   await before.getByRole('button', { name: 'Start tests' }).click();
   await expect(page).toHaveURL(/\/assessments\/[0-9a-f-]{36}$/);
+}
+
+/** After the last test: Findings (step 2), then Exercises, then "Finish without a workout" → the summary. */
+async function finishWithoutWorkout(page: Page) {
+  await expect(page.getByTestId('assessment-findings')).toBeVisible();
+  await page.getByTestId('pick-exercises').click();
+  await expect(page.getByTestId('assessment-exercises')).toBeVisible();
+  await page.getByTestId('finish-without-workout').click();
 }
 
 const SIZES = [
@@ -139,7 +148,8 @@ for (const { size, use } of SIZES) {
       await page.getByRole('button', { name: 'Discomfort left' }).click();
       await expect(page.getByRole('button', { name: 'Discomfort left' })).toHaveAttribute('aria-pressed', 'true');
       await shot(page, `${size}-AS3-shoulder-mobility`);
-      await page.getByRole('button', { name: 'Finish' }).click();
+      await page.getByRole('button', { name: 'Review findings' }).click();
+      await finishWithoutWorkout(page);
 
       // The summary: 30 − 6 = 24 of 30 on the squat (80), 3 of 4 on the shoulders (75), 27 of 34 overall (79, Good).
       await expect(page.getByTestId('assessment-summary')).toBeVisible();
@@ -210,6 +220,7 @@ for (const { size, use } of SIZES) {
 
       // Stop test keeps what was entered; the summary shows it, and a stopped test isn't scored.
       await page.getByRole('button', { name: 'Stop test' }).click();
+      await finishWithoutWorkout(page);
       await expect(page.getByTestId('assessment-summary')).toBeVisible();
       // Only the single-leg squat counts: 10 lines, R knee severe → 18 of 20 = 90.
       await expect(page.getByTestId('movement-score')).toHaveText('90');

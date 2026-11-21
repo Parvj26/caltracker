@@ -98,13 +98,13 @@ describe('importExercises', () => {
       await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), 'caltracker-extra-exercises.json'), 'utf8'),
     ) as { id: string; trackingType: string }[];
     const first = await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
-    expect(first.extras).toBe(15);
+    expect(first.extras).toBe(extras.length);
     const { data, error } = await admin
       .from('exercises')
       .select('external_id, source, workspace_id, tracking_type, image_paths')
       .like('external_id', 'caltracker:%');
     expect(error).toBeNull();
-    expect(data).toHaveLength(15);
+    expect(data).toHaveLength(extras.length);
     expect(data!.every((r) => r.source === 'builtin' && r.workspace_id === null)).toBe(true);
     const own = await loadOwnImages();
     for (const r of data!) {

@@ -11,12 +11,13 @@ const free = JSON.parse(
   readFileSync(path.join(dir, 'fixtures', 'free-exercise-db', 'exercises.json'), 'utf8'),
 ) as FreeExercise[];
 const freeIds = free.map((e) => e.id);
+const freeNames = free.map((e) => e.name);
 const good = (): ExtraExercise => structuredClone(extras[0]!);
 
 describe('CalTracker extra exercises', () => {
-  it('ships the 10 trainer exercises plus 5 conditioning moves, and they validate', () => {
-    expect(extras).toHaveLength(15);
-    expect(validateExtras(extras, freeIds)).toHaveLength(15);
+  it('ships the 10 trainer exercises, 5 conditioning moves and 34 corrective defaults, and they validate', () => {
+    expect(extras).toHaveLength(49);
+    expect(validateExtras(extras, freeIds, freeNames)).toHaveLength(49);
     expect(extras.map((e) => e.name)).toContain('Machine Assisted Pull Up');
     expect(extras.map((e) => e.name)).toEqual(expect.arrayContaining(['Burpee', 'Jumping Jack', 'Bear Crawl', 'High Knees', 'Skater Jump']));
   });
@@ -33,6 +34,8 @@ describe('CalTracker extra exercises', () => {
   it('rejects ids without the caltracker: prefix or that clash with free-exercise-db', () => {
     expect(() => validateExtras([{ ...good(), id: 'Barbell_Squat' }], freeIds)).toThrow(/must start with/);
     expect(() => validateExtras([good()], [good().id])).toThrow(/clashes/);
+    // A free-exercise-db name in another case clashes too.
+    expect(() => validateExtras([good()], freeIds, [good().name.toUpperCase()])).toThrow(/name clashes/);
   });
 
   it('rejects duplicates and images', () => {
