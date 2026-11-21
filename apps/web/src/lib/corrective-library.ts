@@ -206,3 +206,26 @@ export function isExercisePhotoPath(path: string, workspaceId: string, exerciseI
   return re.test(path) && path.startsWith(`custom/${workspaceId.toLowerCase()}/${exerciseId.toLowerCase()}/`);
 }
 export const MAX_EXERCISE_PHOTOS = 2;
+
+/** A custom exercise the new-corrective form already made on an earlier try (the corrective save failed after it). */
+export type MadeExercise = { id: string; name: string; tracking: string };
+
+const cleanName = (s: string) => s.trim().replace(/\s+/g, ' ');
+
+/**
+ * Which exercise a corrective save uses, and what it must do first: `use` an exercise as it is, `create` the new one,
+ * or `rename` the one an earlier try made (its name or tracking changed since). A retry never makes a second exercise.
+ */
+export function exerciseStep(o: {
+  fixedId: string | null;
+  source: 'new' | 'library';
+  pickedId: string | null;
+  made: MadeExercise | null;
+  name: string;
+  tracking: string;
+}): { kind: 'use' | 'rename'; id: string } | { kind: 'create' } | { kind: 'none' } {
+  if (o.fixedId) return { kind: 'use', id: o.fixedId };
+  if (o.source === 'library') return o.pickedId ? { kind: 'use', id: o.pickedId } : { kind: 'none' };
+  if (!o.made) return { kind: 'create' };
+  return cleanName(o.name) !== o.made.name || o.tracking !== o.made.tracking ? { kind: 'rename', id: o.made.id } : { kind: 'use', id: o.made.id };
+}

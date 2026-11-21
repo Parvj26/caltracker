@@ -4,6 +4,7 @@ import {
   coachItems,
   filterLibrary,
   groupLibrary,
+  exerciseStep,
   isExercisePhotoPath,
   libraryMuscles,
   mergeLibrary,
@@ -134,5 +135,24 @@ describe('isExercisePhotoPath', () => {
     expect(isExercisePhotoPath(`custom/${WS}/${FILE}/${FILE}.webp`, WS, EX)).toBe(false);
     expect(isExercisePhotoPath(`custom/${WS}/${EX}/../${FILE}.webp`, WS, EX)).toBe(false);
     expect(isExercisePhotoPath(`free-exercise-db/${FILE}.webp`, WS, EX)).toBe(false);
+  });
+});
+
+describe('exerciseStep', () => {
+  const base = { fixedId: null, source: 'new' as const, pickedId: null, made: null, name: 'DNS Star', tracking: 'reps' };
+  it('uses a fixed or picked exercise', () => {
+    expect(exerciseStep({ ...base, fixedId: 'f' })).toEqual({ kind: 'use', id: 'f' });
+    expect(exerciseStep({ ...base, source: 'library', pickedId: 'p' })).toEqual({ kind: 'use', id: 'p' });
+    expect(exerciseStep({ ...base, source: 'library' })).toEqual({ kind: 'none' });
+  });
+  it('creates a new exercise once, then reuses it on a retry', () => {
+    expect(exerciseStep(base)).toEqual({ kind: 'create' });
+    const made = { id: 'm', name: 'DNS Star', tracking: 'reps' };
+    expect(exerciseStep({ ...base, made, name: '  DNS   Star ' })).toEqual({ kind: 'use', id: 'm' });
+  });
+  it('renames the exercise an earlier try made instead of making a second one', () => {
+    const made = { id: 'm', name: 'DNS Star', tracking: 'reps' };
+    expect(exerciseStep({ ...base, made, name: 'DNS Star Prone' })).toEqual({ kind: 'rename', id: 'm' });
+    expect(exerciseStep({ ...base, made, tracking: 'time' })).toEqual({ kind: 'rename', id: 'm' });
   });
 });

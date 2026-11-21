@@ -22,12 +22,12 @@ import { cx } from '@/components/ui/cx';
 import { BodyMap } from '@/components/body-map/body-map';
 import { regionKey, type RegionStates } from '@/components/body-map/state';
 import { TRACKING_LABELS } from '@/app/(coach)/exercises/filters';
-import { quickCreateExercise, setExercisePhotos } from '@/app/(coach)/exercises/actions';
+import { quickCreateExercise, setExercisePhotos, updateCustomExercise } from '@/app/(coach)/exercises/actions';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { invalidateExerciseIndex, loadExerciseIndex } from '@/lib/exercise-index';
 import { PhotoError } from '@/lib/image-resize';
 import { PhotoTooLargeError, uploadExercisePhoto } from '@/lib/exercise-photos';
-import { bothSides, muscleTagLabel, tagsByMuscle, toggleTag, type LibraryItem } from '@/lib/corrective-library';
+import { bothSides, exerciseStep, muscleTagLabel, tagsByMuscle, toggleTag, type LibraryItem, type MadeExercise } from '@/lib/corrective-library';
 import { deleteCorrective, saveCorrective } from './actions';
 import { CorrectiveSummary } from './parts';
 import styles from './corrective.module.css';
@@ -90,8 +90,38 @@ export function CorrectiveDialog({
   const [error, setError] = useState<{ code: ErrorCode; text?: string } | null>(null);
   const [taken, setTaken] = useState<{ id: string; name: string } | null>(null);
   // A new exercise made by an earlier try (the corrective save failed after): a retry reuses it.
-  const created = useRef<{ id: string; name: string; photoSaved: boolean } | null>(null);
+  // Kept across tries (and renames), so a retry reuses it instead of making a second custom exercise.
+  const created = useRef<(MadeExercise & { photoSaved: boolean }) | null>(null);
   const touch = () => setDirty(true);
+
+  /** Back to the item as saved (Cancel from the edit step to the view step). */
+  function resetForm() {
+    setDirection(item?.direction ?? 'under');
+    setMuscles(item ? [...item.muscles] : []);
+    setSets(String(item?.dose.sets ?? 2));
+    setKind(item?.dose.seconds != null ? 'seconds' : 'reps');
+    setAmount(String(item?.dose.reps ?? item?.dose.seconds ?? ''));
+    setEachSide(item?.dose.eachSide ?? false);
+    setDirty(false);
+    setError(null);
+    setTaken(null);
+  }
+
+  // A new step moves focus into it (the dialog only does that when it opens): the first field of the form, Cancel in
+  // the delete question (an alertdialog: the safe choice), or the first control of the view.
+  const firstStep = useRef(true);
+  useEffect(() => {
+    if (firstStep.current) {
+      firstStep.current = false;
+      return;
+    }
+    const target = document.querySelector<HTMLElement>(`dialog[open] [data-step-focus="${step}"]`);
+    const first =
+      target && !target.matches('button, input, select, textarea, a[href]')
+        ? target.querySelector<HTMLElement>('input:not([type="hidden"]):not([aria-hidden="true"]), select, textarea, button, a[href]')
+        : target;
+    first?.focus();
+  }, [step]);
 
   // ----- from library -----
   const [libQuery, setLibQuery] = useState('');
@@ -159,16 +189,25 @@ export function CorrectiveDialog({
     setError(null);
     setTaken(null);
     try {
-      let exerciseId = fixed?.id ?? (source === 'library' ? picked?.id : created.current?.id) ?? null;
-      if (!exerciseId) {
+      const plan = exerciseStep({ fixedId: fixed?.id ?? null, source, pickedId: picked?.id ?? null, made: created.current, name, tracking });
+      let exerciseId: string;
+      if (plan.kind === 'none') return;
+      if (plan.kind === 'create') {
         const out = await quickCreateExercise({ name, trackingType: tracking });
         if (!out.ok) {
           setError({ code: out.code });
           if (out.existing) setTaken(out.existing);
           return;
         }
-        created.current = { id: out.id, name: out.name, photoSaved: false };
+        created.current = { id: out.id, name: out.name, tracking: out.trackingType, photoSaved: false };
         exerciseId = out.id;
+      } else {
+        exerciseId = plan.id;
+        if (plan.kind === 'rename' && created.current) {
+          // Made by an earlier try with just a name and tracking type: the same, renamed.
+          await updateCustomExercise(plan.id, { name, trackingType: tracking, primaryMuscles: [], equipment: null, instructions: [], youtubeUrl: null });
+          created.current = { ...created.current, name: name.trim().replace(/\s+/g, ' '), tracking };
+        }
       }
       if (source === 'new' && !fixed && photo && created.current && !created.current.photoSaved) {
         const path = await uploadExercisePhoto(workspaceId, exerciseId, photo);
@@ -249,7 +288,7 @@ export function CorrectiveDialog({
       )
     ) : step === 'delete' ? (
       <>
-        <Button variant="secondary" onClick={() => (start.step === 'delete' ? ref.current?.requestClose() : setStep('view'))} disabled={pending} phSafe>
+        <Button variant="secondary" onClick={() => (start.step === 'delete' ? ref.current?.requestClose() : setStep('view'))} disabled={pending} phSafe data-step-focus="delete">
           Cancel
         </Button>
         <Button variant="danger" onClick={() => void remove()} pending={pending} phSafe>
@@ -258,7 +297,19 @@ export function CorrectiveDialog({
       </>
     ) : (
       <>
-        <Button variant="secondary" onClick={() => ref.current?.requestClose()} disabled={pending} phSafe>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            if (start.step !== 'view') {
+              ref.current?.requestClose();
+              return;
+            }
+            resetForm();
+            setStep('view');
+          }}
+          disabled={pending}
+          phSafe
+        >
           Cancel
         </Button>
         <Button variant="primary" onClick={() => void save()} pending={pending} disabled={reason !== null} disabledReason={reason ?? undefined} phSafe>
@@ -285,7 +336,7 @@ export function CorrectiveDialog({
       footer={footer}
     >
       {step === 'view' && item ? (
-        <div className={styles.viewStep}>
+        <div className={styles.viewStep} data-step-focus="view">
           <CorrectiveSummary item={item} headingLevel={3} />
           {item.yours ? (
             <button type="button" className={styles.dangerText} onClick={() => setStep('delete')}>
@@ -307,6 +358,7 @@ export function CorrectiveDialog({
       {step === 'edit' ? (
         <form
           className={styles.form}
+          data-step-focus="edit"
           aria-label="Corrective exercise"
           onSubmit={(e) => {
             e.preventDefault();
@@ -343,7 +395,6 @@ export function CorrectiveDialog({
                     autoComplete="off"
                     onChange={(e) => {
                       setName(e.target.value);
-                      created.current = null;
                       touch();
                     }}
                   />

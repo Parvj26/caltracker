@@ -129,7 +129,16 @@ for (const { size, use } of SIZES) {
         await expect(view.getByText('2 × 5 each side')).toBeVisible();
         await shot(page, `${size}-3-open`);
         await audit(page, size, 'dialog[open]');
+        // Edit moves focus into the form; Cancel goes back to the view, with nothing changed.
         await view.getByRole('button', { name: 'Edit' }).click();
+        const editing = page.getByRole('dialog', { name: 'Edit corrective exercise' });
+        await expect(editing.getByRole('form', { name: 'Corrective exercise' })).toBeVisible();
+        expect(await page.evaluate(() => !!document.activeElement?.closest('form[aria-label="Corrective exercise"]'))).toBe(true);
+        await editing.getByLabel('Reps (optional)').fill('9');
+        await editing.getByRole('button', { name: 'Cancel' }).click();
+        await expect(view.getByText('2 × 5 each side')).toBeVisible();
+        await view.getByRole('button', { name: 'Edit' }).click();
+        await expect(editing.getByLabel('Reps (optional)')).toHaveValue('5');
       }
       const edit = page.getByRole('dialog', { name: 'Edit corrective exercise' });
       await expect(edit.getByText(name)).toBeVisible();
@@ -170,6 +179,8 @@ for (const { size, use } of SIZES) {
         await page.getByRole('dialog', { name }).getByRole('button', { name: 'Delete from corrective exercises…' }).click();
       }
       const confirm = page.getByRole('alertdialog', { name: `Delete “${name}”?` });
+      // The question starts on Cancel (the safe choice).
+      await expect(confirm.getByRole('button', { name: 'Cancel' })).toBeFocused();
       await shot(page, `${size}-5-delete`);
       await confirm.getByRole('button', { name: 'Delete' }).click();
       await expect(confirm).toBeHidden({ timeout: 20_000 });

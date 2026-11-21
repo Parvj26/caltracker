@@ -207,11 +207,11 @@ export async function setExercisePhotos(exerciseId: string, paths: string[]): Pr
   const before = current.data.image_paths;
   const folder = `custom/${workspaceId}/${idCheck.data}`;
   const added = paths.filter((p) => !before.includes(p));
-  if (added.length > 0) {
-    const listed = await supabase.storage.from('exercise-images').list(folder, { limit: 100 });
-    if (listed.error) return fail('exercise_photo_failed', where);
-    const there = new Set(listed.data.map((f) => `${folder}/${f.name}`));
-    if (!added.every((p) => there.has(p))) return fail('exercise_photo_failed', where);
+  // Each new file must be there: looked up by its exact name in the folder (a listing of the folder could be cut off).
+  for (const p of added) {
+    const file = p.slice(folder.length + 1);
+    const found = await supabase.storage.from('exercise-images').list(folder, { limit: 10, search: file });
+    if (found.error || !found.data.some((f) => f.name === file)) return fail('exercise_photo_failed', where);
   }
 
   const { data, error } = await supabase
