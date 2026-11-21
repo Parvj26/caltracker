@@ -782,3 +782,6 @@ export {
 export type { MetricEntry, MetricEntryRow, MetricOrigin, MetricRange, MetricSummary } from './metrics/summary';
 export { readAllPages } from './metrics/pages';
 export { metricDayText, metricEntryMeta, metricEntryWho, metricValueParts } from './metrics/card';
+
+// Movement assessments (Limitations & injuries tab).
+export * from './assessment';
