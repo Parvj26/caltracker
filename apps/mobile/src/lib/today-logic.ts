@@ -168,6 +168,51 @@ export function nextUpDay(date: IsoDate, today: IsoDate): string {
   return ahead >= 1 && ahead <= 6 ? WEEKDAYS[isoWeekday(date) - 1] ?? formatDayLabel(date) : formatDayLabel(date);
 }
 
+/** How far ahead the done card looks for the next coach-planned workout ("Up next"). */
+export const UP_NEXT_DAYS = 7;
+
+/**
+ * True when every one of today's workouts is done: the done card then has room for "Up next". Never with no
+ * workouts (that is the rest day, which says "Next: …" itself) or while one is still going.
+ */
+export function allWorkoutsDone(workoutIds: readonly string[], statuses: Readonly<Record<string, { kind: string } | undefined>>): boolean {
+  return workoutIds.length > 0 && workoutIds.every((id) => statuses[id]?.kind === 'done');
+}
+
+/**
+ * When the done card reads and shows "Up next": every one of today's workouts done, online (it can't be read offline),
+ * and no workout going on this phone (an empty or unplanned one started after the planned one is mid-task).
+ */
+export function upNextDue(s: {
+  workoutIds: readonly string[];
+  statuses: Readonly<Record<string, { kind: string } | undefined>>;
+  offline: boolean;
+  workoutInProgress: boolean;
+}): boolean {
+  return !s.offline && !s.workoutInProgress && allWorkoutsDone(s.workoutIds, s.statuses);
+}
+
+export type UpNext = {
+  id: string;
+  name: string;
+  /** "Up next · Saturday" (shown in small capitals). */
+  label: string;
+  /** For VoiceOver: "Up next: Lower, Saturday. Preview". */
+  accessibilityLabel: string;
+};
+
+/**
+ * The "Up next" line under today's done workout: the next coach-planned workout within the coming week (nextUpDay
+ * words the day, as on the rest day). Null when nothing is planned in the next 7 days.
+ */
+export function upNextLine(next: { id: string; name: string; scheduledOn: IsoDate } | null, today: IsoDate): UpNext | null {
+  if (!next) return null;
+  const ahead = diffDays(today, next.scheduledOn);
+  if (ahead < 1 || ahead > UP_NEXT_DAYS) return null;
+  const day = nextUpDay(next.scheduledOn, today);
+  return { id: next.id, name: next.name, label: `Up next · ${day}`, accessibilityLabel: `Up next: ${next.name}, ${day}. Preview` };
+}
+
 export type FoodBar = {
   /** "1,240 / 2,100" (calories) or "96 / 170 g"; without a target just the total ("1,240 kcal"). */
   value: string;

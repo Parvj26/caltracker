@@ -105,7 +105,7 @@ env:
 - tapOn:
     id: tab-coach
 - tapOn:
-    id: coach-strip-community
+    id: open-community
 - extendedWaitUntil:
     visible: 'E2E Leg day done'
     timeout: 15000
