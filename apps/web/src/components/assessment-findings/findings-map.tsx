@@ -22,6 +22,7 @@ export function FindingsMap({
   size = 'medium',
   startView = 'back',
   label = 'Findings',
+  allViews = false,
   children,
   className,
 }: {
@@ -31,6 +32,8 @@ export function FindingsMap({
   size?: 'small' | 'medium' | 'large';
   startView?: BodyView;
   label?: string;
+  /** Both views always (side by side, wrapping when narrow), no switch: for small maps in tight columns (Compare). */
+  allViews?: boolean;
   children?: ReactNode;
   className?: string;
 }) {
@@ -38,6 +41,7 @@ export function FindingsMap({
   const views: BodyView[] = ['front', 'back'];
   return (
     <div className={cx(styles.mapWrap, className)} data-testid="findings-map">
+      {allViews ? null : (
       <div className={styles.viewSwitch} role="group" aria-label="Side of the body">
         {views.map((v) => (
           <button key={v} type="button" className={styles.segment} aria-pressed={view === v} onClick={() => setView(v)}>
@@ -45,9 +49,10 @@ export function FindingsMap({
           </button>
         ))}
       </div>
-      <div className={styles.figures}>
+      )}
+      <div className={cx(styles.figures, allViews && styles.figuresAll)}>
         {views.map((v) => (
-          <div key={v} className={styles.figure} data-hidden={view === v ? undefined : ''} data-view={v}>
+          <div key={v} className={styles.figure} data-hidden={allViews || view === v ? undefined : ''} data-view={v}>
             <BodyMap
               view={v}
               label={`${label}: ${v === 'front' ? 'front' : 'back'} of body`}

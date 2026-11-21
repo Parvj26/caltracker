@@ -128,7 +128,7 @@ export async function CompareBodyMaps({ columns }: CompareSlotProps) {
         {all.map(({ a, states }) => (
           <section key={a.id} aria-label={SLOT_LABELS[a.slot]} className={styles.compareMap}>
             <h3 className={styles.kicker}>{SLOT_LABELS[a.slot]}</h3>
-            <FindingsMap states={states} size="small" label={`${SLOT_LABELS[a.slot]} findings`} />
+            <FindingsMap states={states} size="small" allViews label={`${SLOT_LABELS[a.slot]} findings`} />
           </section>
         ))}
       </div>

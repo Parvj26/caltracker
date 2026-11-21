@@ -21,6 +21,7 @@
   .viewSwitch { display: none; }
   .figure[data-hidden] { display: flex; }
 }
+.figuresAll { flex-wrap: wrap; gap: var(--ct-space-3); }
 .legend { justify-content: center; }
 
 .markChip {
