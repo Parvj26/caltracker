@@ -173,11 +173,16 @@ test('Overview is the default tab and shows training, highlights, body metrics, 
   await expect(profile.getByText(/Dubai \(Asia\/Dubai\)/)).toBeVisible();
 });
 
-test('the coach keeps a goal, limitations and notes; an injury chip tops Overview', async ({ page }) => {
+test('the coach keeps a goal and notes; an injury chip from the open flags tops Overview', async ({ page }) => {
   const s = await setup();
   await signIn(page, s);
   await page.goto(`/clients/${s.clientId}`);
   await expect(page.getByTestId('injury-chip')).toHaveCount(0);
+  // Limitations & injuries are flags (flags.spec.ts covers adding and resolving them); the chip shows the newest open one.
+  const flag = await admin
+    .from('client_flags')
+    .insert({ workspace_id: s.workspaceId, client_id: s.clientId, region: 'knee', side: 'L', type: 'limitation', note: 'No deep squats.' });
+  if (flag.error) throw flag.error;
 
   const goal = card(page, 'Goal & countdown');
   await goal.getByRole('button', { name: 'Set goal' }).click();
@@ -188,12 +193,9 @@ test('the coach keeps a goal, limitations and notes; an injury chip tops Overvie
   await expect(goal.getByText('Run the Dubai half marathon')).toBeVisible();
   await expect(goal.getByText('Shared with Tara.')).toBeVisible();
 
-  const limits = card(page, 'Limitations & injuries');
-  await limits.getByRole('button', { name: 'Edit limitations and injuries' }).click();
-  await limits.getByLabel('Limitations and injuries').fill('Left knee: no deep squats.');
-  await limits.getByRole('button', { name: 'Save' }).click();
-  await expect(limits.getByText('Left knee: no deep squats.')).toBeVisible();
-  // The chip shows the note's first line; a tap shows the whole note under it.
+  await page.reload();
+  await expect(card(page, 'Limitations & injuries').getByText('Left knee', { exact: true })).toBeVisible();
+  // The chip shows the newest open flag; a tap lists every open flag under it.
   const chip = page.getByRole('button', { name: /^Injury: Left knee: no deep squats/ });
   await expect(chip).toBeVisible();
   await expect(chip).toHaveAttribute('aria-expanded', 'false');

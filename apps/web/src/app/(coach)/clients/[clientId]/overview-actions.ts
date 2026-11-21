@@ -1,12 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { codeForMessage, validateGoal, validateLimitations, validateNote, type ErrorCode } from '@caltracker/shared';
+import { codeForMessage, validateGoal, validateNote, type ErrorCode } from '@caltracker/shared';
 import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
 
-// The client Overview's coach records: notes, limitations (injuries) and the goal. Every action starts with
+// The client Overview's coach records: notes and the goal (flags are in flags-actions.ts). Every action starts with
 // requireCoach() and takes the workspace from it, never from the browser. RLS does the real checking: only the coach
 // of the workspace reads or writes, and only for a current client (a removed client's records are read-only).
 
@@ -49,26 +49,6 @@ export async function deleteNote(noteId: string): Promise<RecordOutcome> {
   const supabase = await createServerSupabase();
   const { error } = await supabase.from('client_notes').delete().eq('id', noteId).eq('workspace_id', workspaceId);
   if (error) return fail('note_delete_failed', 'action:overview.deleteNote');
-  refresh();
-  return { ok: true };
-}
-
-/** One record per client: update it, or create it the first time (a race with another tab ends in an update). */
-export async function saveLimitations(clientId: string, body: string): Promise<RecordOutcome> {
-  const { workspaceId } = await requireCoach();
-  if (!UUID.test(clientId) || typeof body !== 'string') return fail('request_invalid', 'action:overview.saveLimitations');
-  const checked = validateLimitations(body);
-  if (!checked.ok) return fail(codeForMessage(checked.error, 'field_format'), 'action:overview.saveLimitations');
-  const supabase = await createServerSupabase();
-  const update = () =>
-    supabase.from('client_limitations').update({ body: checked.value }).eq('workspace_id', workspaceId).eq('client_id', clientId).select('client_id');
-  let result = await update();
-  if (!result.error && result.data.length === 0) {
-    const inserted = await supabase.from('client_limitations').insert({ workspace_id: workspaceId, client_id: clientId, body: checked.value });
-    if (inserted.error?.code === '23505') result = await update();
-    else if (inserted.error) return fail(refusal(inserted.error.code), 'action:overview.saveLimitations');
-  }
-  if (result.error) return fail(refusal(result.error.code), 'action:overview.saveLimitations');
   refresh();
   return { ok: true };
 }

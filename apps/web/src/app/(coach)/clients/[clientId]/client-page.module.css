@@ -217,7 +217,9 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.injuryNote { list-style: none; display: flex; flex-direction: column; gap: var(--ct-space-1); }
 .injuryNote[hidden] { display: none; }
+.injuryFull { display: block; white-space: pre-wrap; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* ---------- Today card (top of Overview) ---------- */
@@ -251,6 +253,11 @@
 .column { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
 /* Two columns (iPad portrait): the cards flow down one column and on into the next, like a newspaper, so a short
    card never leaves a hole beside a tall one. */
+/* One column (phones): the cards are the grid's own items, so Limitations & injuries can move up under Today. */
+@media (max-width: 699.98px) {
+  .grid .column, .grid .side { display: contents; }
+  .flagsFirst { order: -1; }
+}
 @media (min-width: 700px) and (max-width: 1023.98px) {
   .grid { display: block; column-count: 2; column-gap: var(--ct-space-3); }
   .grid .column, .grid .side { display: contents; }

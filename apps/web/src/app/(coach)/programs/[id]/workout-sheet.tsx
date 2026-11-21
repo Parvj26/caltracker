@@ -14,6 +14,7 @@ import { cellLabel, copyDaySuffix } from './grid-ids';
 import type { Slot } from './program-grid';
 import styles from '../programs.module.css';
 import { openLayer } from '@/lib/open-layer';
+import { FlagReminderLoader } from '@/components/flags/flag-reminder';
 
 /**
  * What the sheet is for: a new workout for one program day, editing the workout on a placed day, or a new workout
@@ -225,6 +226,8 @@ export function WorkoutSheet({
           </div>
         </div>
       ) : null}
+      {/* A workout for one client: their open flags under the title (board AS10). */}
+      {target.kind === 'client' ? <FlagReminderLoader clientId={target.clientId} /> : null}
       {target.kind === 'new' ? (
         <p className={styles.sheetNote}>Saving puts it on {where} and in your Workouts list, then brings you back to the program.</p>
       ) : null}

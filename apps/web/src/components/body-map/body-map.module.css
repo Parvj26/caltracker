@@ -1,0 +1,40 @@
+/* The body map (boards AS4 / AS9). Sizes are the figure's width; the height follows the 200 × 420 drawing. */
+.map { display: block; flex: none; height: auto; max-width: 100%; overflow: visible; }
+.small { width: 110px; }
+.medium { width: 170px; }
+/* Pickers: as big as fits, up to 260 px (a phone can still pinch-zoom the page for the small regions). */
+.large { width: min(260px, 100%); }
+.interactive { touch-action: manipulation; }
+
+.head { fill: var(--ct-map-skin); stroke: var(--ct-map-outline); stroke-width: 1.4; }
+.edge { fill: none; stroke: var(--ct-map-outline); stroke-width: 2.8; }
+.skin { fill: var(--ct-map-skin); }
+.region { stroke: var(--ct-bg); stroke-width: 1.6; stroke-linejoin: round; }
+.hit { cursor: pointer; }
+/* Focus: an ink outline drawn on the shape itself (an outline box around an SVG path is not reliable in Safari). */
+.hit:focus { outline: none; }
+.hit:focus-visible { stroke: var(--ct-ink); stroke-width: 3; }
+@media (hover: hover) {
+  .region.hit:hover { filter: brightness(0.94); }
+}
+.normal { fill: none; stroke: var(--ct-map-normal-line); stroke-width: 1.3; stroke-linejoin: round; pointer-events: none; }
+.normal .tick { stroke-width: 1.9; stroke-linecap: round; }
+/* Joints: invisible tap areas until hovered or focused. */
+.area { fill: transparent; stroke: none; }
+.area.hit:hover { fill: color-mix(in srgb, var(--ct-ink) 10%, transparent); }
+.selected { fill: none; stroke: var(--ct-ink); stroke-width: 2.8; stroke-linejoin: round; pointer-events: none; }
+
+.pins { pointer-events: none; }
+.pinRing { fill: color-mix(in srgb, var(--ct-amber) 35%, transparent); stroke: var(--ct-amber-deep); }
+.pinDot { fill: var(--ct-ink); stroke: var(--ct-bg); }
+.pinText { fill: var(--ct-bg); font-weight: 800; font-family: inherit; }
+.sides { fill: var(--ct-ink-muted); font-size: 15px; font-weight: 800; font-family: inherit; }
+
+.legend { display: flex; flex-wrap: wrap; gap: var(--ct-space-1) var(--ct-space-3); margin: 0; padding: 0; list-style: none; font-size: var(--ct-size-caption); font-weight: 700; }
+.legend li { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
+.legend svg { width: 14px; height: 14px; flex: none; }
+/* Tap mode: a clear button over the whole figure (at least 44 px: it is ~110 × 230). */
+.tapWrap { position: relative; flex: none; }
+.tapButton { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: var(--ct-radius-input); background: transparent; cursor: pointer; }
+.tapButton:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+@media (hover: hover) { .tapButton:hover { background: color-mix(in srgb, var(--ct-ink) 4%, transparent); } }

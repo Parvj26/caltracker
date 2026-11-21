@@ -340,12 +340,13 @@ test("with two people training, each person's screen shows their own injury note
   const coach = await newCoach(page);
   const anna = await newClient(coach.workspaceId, 'Anna', 'Injured');
   const ben = await newClient(coach.workspaceId, 'Ben', 'Injured');
-  const note = async (clientId: string, body: string) => {
-    const r = await admin.from('client_limitations').insert({ workspace_id: coach.workspaceId, client_id: clientId, body });
+  const flag = async (clientId: string, region: string, side: string, note: string, since?: string) => {
+    const r = await admin.from('client_flags').insert({ workspace_id: coach.workspaceId, client_id: clientId, region, side, type: 'limitation', note, ...(since ? { since } : {}) });
     if (r.error) throw r.error;
   };
-  await note(anna.id, 'Left knee: no deep squats.\nNo jumping');
-  await note(ben.id, 'Right shoulder: no overhead pressing');
+  await flag(anna.id, 'knee', 'R', 'No jumping', '2026-01-01');
+  await flag(anna.id, 'knee', 'L', 'No deep squats.');
+  await flag(ben.id, 'shoulders', 'R', 'No overhead pressing');
 
   // The coach logs Anna's session; Ben trains on his phone at the same time.
   const today = await page.evaluate(() => new Intl.DateTimeFormat('en-CA').format(new Date()));
