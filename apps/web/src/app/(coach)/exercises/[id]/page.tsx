@@ -12,6 +12,7 @@ import styles from '../exercises.module.css';
 import { BackToExercises } from './back-link';
 import { DetailStar } from './detail-star';
 import { OverrideForm } from './override-form';
+import { ExercisePhotos } from './exercise-photos';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   return exercisePageTitle((await params).id);
@@ -116,7 +117,16 @@ export default async function ExercisePage({ params }: { params: Promise<{ id: s
         </Card>
       )}
 
-      {ex.image_paths.length > 0 ? (
+      {isCustom ? (
+        <Card>
+          <section aria-labelledby="photos-heading">
+            <h2 id="photos-heading" className={styles.sectionHeading}>
+              Photos
+            </h2>
+            <ExercisePhotos workspaceId={workspaceId} exerciseId={ex.id} name={ex.name} paths={ex.image_paths} />
+          </section>
+        </Card>
+      ) : ex.image_paths.length > 0 ? (
         <div className={styles.images}>
           {ex.image_paths.map((p) => (
             // eslint-disable-next-line @next/next/no-img-element -- plain img keeps the app host-agnostic (no image optimizer)

@@ -1,0 +1,12 @@
+/* A custom exercise's photos (start and end): two slots side by side, wrapping on a narrow phone. */
+.photos { display: flex; flex-direction: column; gap: var(--ct-space-3); container-type: inline-size; }
+.slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-3); margin: 0; padding: 0; list-style: none; max-width: 520px; }
+.slots:empty { display: none; }
+.slot { display: flex; flex-direction: column; gap: var(--ct-space-2); }
+.img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--ct-radius-input); background: var(--ct-surface); }
+.slotFoot { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); }
+.slotName { font-size: 14px; font-weight: var(--ct-weight-section-heading); }
+.addButton { align-self: flex-start; }
+.file { display: none; }
+.hint { margin: 0; font-size: 13px; color: var(--ct-ink-muted); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
