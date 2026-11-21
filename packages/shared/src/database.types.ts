@@ -408,6 +408,7 @@ export type Database = {
           id: string
           note: string
           position: number
+          revision: number
           score: number | null
           status: string
           test_key: string
@@ -426,6 +427,7 @@ export type Database = {
           id?: string
           note?: string
           position: number
+          revision?: number
           score?: number | null
           status?: string
           test_key: string
@@ -444,6 +446,7 @@ export type Database = {
           id?: string
           note?: string
           position?: number
+          revision?: number
           score?: number | null
           status?: string
           test_key?: string
@@ -4138,6 +4141,7 @@ export type Database = {
         Args: {
           p_discomfort_left: boolean
           p_discomfort_right: boolean
+          p_expected_revision?: number
           p_follow_ups: Json
           p_measures: Json
           p_note: string
@@ -4147,7 +4151,7 @@ export type Database = {
           p_test_id: string
           p_type_done: string
         }
-        Returns: undefined
+        Returns: number
       }
       save_body_measurement: { Args: { p: Json }; Returns: string }
       save_corrective_exercise: {

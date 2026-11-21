@@ -69,5 +69,7 @@ export default async function AssessmentPage({
   if (test === null && assessment.tests.length > 0 && assessment.tests.every((t) => t.entry.status !== 'pending')) {
     redirect(`/clients/${client.id}/assessments/${assessment.id}/findings`);
   }
-  return <RunView client={who} assessment={assessment} testFromUrl={test} />;
+  // A fresh id per server render: the run screen reloads itself when the browser shows this render again from its
+  // cache (Back from Findings), so it never shows or saves old marks.
+  return <RunView client={who} assessment={assessment} testFromUrl={test} renderId={crypto.randomUUID()} />;
 }

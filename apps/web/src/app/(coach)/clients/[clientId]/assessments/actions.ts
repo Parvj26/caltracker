@@ -79,9 +79,20 @@ export async function startAssessment(input: StartInput): Promise<{ ok: true; id
   return { ok: true, id: data };
 }
 
-export async function saveAssessmentTest(testId: string, entry: unknown): Promise<{ ok: true; score: number | null } | ActionFailure> {
+/**
+ * Saves one test. `revision` is the one the screen loaded (or got back from its last save): when the test was saved
+ * since, by another tab or a stale cached screen, the database refuses (`assessment_changed`) instead of writing old
+ * marks over newer ones. Returns the new revision.
+ */
+export async function saveAssessmentTest(
+  testId: string,
+  entry: unknown,
+  revision: unknown,
+): Promise<{ ok: true; score: number | null; revision: number } | ActionFailure> {
   const { workspaceId } = await requireCoach();
-  if (!isUuid(testId)) return fail('assessment_invalid', 'action:assessments.saveTest');
+  if (!isUuid(testId) || typeof revision !== 'number' || !Number.isInteger(revision) || revision < 0) {
+    return fail('assessment_invalid', 'action:assessments.saveTest');
+  }
   const supabase = await createServerSupabase();
   const { data: row, error: readError } = await supabase
     .from('assessment_tests')
@@ -95,7 +106,7 @@ export async function saveAssessmentTest(testId: string, entry: unknown): Promis
   const checked = checkTestEntry(definition, entry);
   if (!checked) return fail('assessment_invalid', 'action:assessments.saveTest');
   const score = testScore({ definition, status: checked.status, results: checked.results });
-  const { error } = await supabase.rpc('save_assessment_test', {
+  const { data: saved, error } = await supabase.rpc('save_assessment_test', {
     p_test_id: testId,
     p_status: checked.status,
     p_results: checked.results.map((r) => ({ checkpoint_id: r.checkpointId, side: r.side, severity: r.severity })),
@@ -107,9 +118,10 @@ export async function saveAssessmentTest(testId: string, entry: unknown): Promis
     p_note: checked.note,
     // The generated types say number; the column takes null for "not scored".
     p_score: score as number,
+    p_expected_revision: revision,
   });
   if (error) return failFor(error, 'assessment_save_failed', 'action:assessments.saveTest');
-  return { ok: true, score };
+  return { ok: true, score, revision: saved };
 }
 
 export async function finishAssessment(assessmentId: string): Promise<{ ok: true; score: number | null } | ActionFailure> {
@@ -183,6 +195,8 @@ function failFor(
   where: string,
 ): ActionFailure {
   if (error.code === '42501') return fail('assessment_denied', where);
+  // Saved since this screen loaded it (save_assessment_test's revision check).
+  if (error.code === 'PT409') return fail('assessment_changed', where);
   // Started twice (another tab, or a double tap): the slot or the cycle number is already taken.
   if (error.code === '23505') return fail('assessment_exists', where);
   if (error.code === '23514' && /finish|cycle/i.test(error.message ?? '')) return fail('assessment_order', where);
