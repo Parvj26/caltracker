@@ -119,11 +119,15 @@ describe('changeInviteEmail', () => {
     expect(await changeInviteEmail({ inviteId: INVITE, email: 'ana@new.test', today: '2026-11-20' })).toMatchObject({ ok: true, oldCancelled: false });
     deleteRemoves = true;
     lookupFails = true;
+    deletes.length = 0;
     expect(await changeInviteEmail({ inviteId: INVITE, email: 'ana@new2.test', today: '2026-11-20' })).toMatchObject({
       ok: true,
       inviteId: null,
       planError: 'invite_plan_program_failed',
+      oldCancelled: false,
     });
+    // The old invite (and its plan) stays.
+    expect(deletes).toEqual([]);
   });
 
   it('changes nothing when the new invite is not sent', async () => {

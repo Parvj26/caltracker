@@ -258,9 +258,13 @@ export async function changeInviteEmail(input: { inviteId: string; email: string
     // The new invite couldn't be found to keep the plan with it: say so (as inviteClient does).
     planError = planFailed;
   }
-  // The old link stops working (checked: only a deleted row means it did).
-  const gone = await supabase.from('client_invites').delete().eq('id', old.id).eq('workspace_id', workspaceId).is('accepted_at', null).select('id');
-  const oldCancelled = !gone.error && gone.data.length > 0;
+  // The old link stops working (checked: only a deleted row means it did). Not when the new invite couldn't be found:
+  // then the old one keeps its plan, and the window stays on it.
+  let oldCancelled = false;
+  if (newId) {
+    const gone = await supabase.from('client_invites').delete().eq('id', old.id).eq('workspace_id', workspaceId).is('accepted_at', null).select('id');
+    oldCancelled = !gone.error && gone.data.length > 0;
+  }
   revalidatePath('/clients');
   return { ok: true, result, inviteId: newId, planError, oldCancelled };
 }
