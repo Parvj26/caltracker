@@ -25,7 +25,7 @@ import {
 import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
 import { fetchFirstName, readCachedFirstName } from '@/lib/today-api';
-import { greeting, headerDate, welcome } from '@/lib/today-logic';
+import { allWorkoutsDone, greeting, headerDate, upNextLine, welcome } from '@/lib/today-logic';
 import { nextUpLabel } from '@/lib/log-flow-model';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useCachedLoad } from '@/lib/use-cached-load';
@@ -226,6 +226,24 @@ export default function Today() {
     [data, active, finished, pending],
   );
 
+  // "Up next" in the done card: once every one of today's workouts is done, read the next planned one. Best effort
+  // and never waited for (a failed read just leaves the line out); not offline, where it can't be read.
+  const allDone = data?.kind === 'today' && !data.offline && allWorkoutsDone(data.workouts.map((w) => w.id), statuses);
+  const [upNextRead, setUpNextRead] = useState<{ day: IsoDate; next: WorkoutSummary | null } | null>(null);
+  useEffect(() => {
+    if (!allDone) return;
+    let alive = true;
+    // Read again with each load of Today (focus, pull to refresh), so a plan the coach changed shows.
+    void fetchNextWorkout(today).then(
+      (next) => alive && setUpNextRead({ day: today, next }),
+      () => alive && setUpNextRead(null),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [allDone, today, data]);
+  const upNext = allDone && upNextRead?.day === today ? upNextLine(upNextRead.next, today) : null;
+
   const openLog = useCallback(
     (id: string) => {
       if (navigating.current) return;
@@ -353,7 +371,7 @@ export default function Today() {
 
         {/* More than one workout today: one card each, stacked. */}
         {data?.kind === 'today'
-          ? data.workouts.map((w) => (
+          ? data.workouts.map((w, i) => (
               <WorkoutCard
                 key={w.id}
                 workout={w}
@@ -363,6 +381,7 @@ export default function Today() {
                 starting={starting === w.id}
                 onStart={() => void startWorkout(w)}
                 onView={openSummary}
+                upNext={i === data.workouts.length - 1 ? upNext : null}
               />
             ))
           : null}

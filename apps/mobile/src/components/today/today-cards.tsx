@@ -3,7 +3,7 @@
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { borderWidth, tapTarget } from '@caltracker/design-tokens';
+import { borderWidth, tapTarget, typeScale } from '@caltracker/design-tokens';
 import {
   formatLogDuration,
   localToday,
@@ -35,6 +35,7 @@ import {
   restNextLine,
   restPreviewLabel,
   unreadLabel,
+  type UpNext,
   weekTile,
   workoutMeta,
   zooHref,
@@ -96,6 +97,7 @@ export function WorkoutCard({
   starting,
   onStart,
   onView,
+  upNext = null,
 }: {
   workout: WorkoutSummary;
   /** The whole plan, once read (for the sets and time); null meanwhile. */
@@ -108,6 +110,8 @@ export function WorkoutCard({
   onStart: () => void;
   /** Opens the finished workout's summary. */
   onView: (logId: string) => void;
+  /** Once all of today's workouts are done: the next planned one, shown inside this done card. */
+  upNext?: UpNext | null;
 }) {
   const { text, space } = useTheme();
   const router = useRouter();
@@ -117,7 +121,9 @@ export function WorkoutCard({
   const chip = programChip(workout.programDay ?? null);
 
   // Done: the card shrinks to one row (approved Today states board) and the food card moves up under it.
-  if (status?.kind === 'done') return <DoneRow workout={workout} logId={status.logId} durationS={status.durationS} onView={onView} />;
+  if (status?.kind === 'done') {
+    return <DoneRow workout={workout} logId={status.logId} durationS={status.durationS} onView={onView} upNext={upNext} />;
+  }
 
   const going = status?.kind === 'in_progress';
   const fraction = progress ? progress.done / Math.max(1, progress.total.max) : 0;
@@ -177,7 +183,19 @@ export function WorkoutCard({
 }
 
 /** "Lower Body done · 17 of 19 sets · 2 new bests · Summary ›": the finished workout, one tap from its summary. */
-function DoneRow({ workout, logId, durationS, onView }: { workout: WorkoutSummary; logId: string; durationS: number; onView: (logId: string) => void }) {
+function DoneRow({
+  workout,
+  logId,
+  durationS,
+  onView,
+  upNext,
+}: {
+  workout: WorkoutSummary;
+  logId: string;
+  durationS: number;
+  onView: (logId: string) => void;
+  upNext: UpNext | null;
+}) {
   const { text, space } = useTheme();
   const { finishedLog, pending } = useActiveLog();
   const local = finishedLog?.id === logId ? finishedLog : (pending.find((p) => p.id === logId) ?? null);
@@ -194,14 +212,19 @@ function DoneRow({ workout, logId, durationS, onView }: { workout: WorkoutSummar
   const log = local ?? remote;
   const counts = log ? logSetCount(log) : null;
   const line = doneLine(counts ? setProgressText(counts.done, { min: counts.total.min, max: counts.total.min }) : null, bests, formatLogDuration(durationS));
-  return (
+  const summary = (
     <Pressable
       testID={`today-done-${workout.id}`}
       onPress={() => onView(logId)}
       accessibilityRole="button"
       accessibilityLabel={`${workout.name} done. ${line}`}
       accessibilityHint="Opens the workout summary"
-      style={({ pressed }) => [styles.row, styles.quiet, { borderRadius: 18, padding: space[3.5], gap: space[3], minHeight: 64 }, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.row,
+        { padding: space[3.5], gap: space[3], minHeight: 64 },
+        !upNext && [styles.quiet, styles.doneCard],
+        pressed && styles.pressed,
+      ]}
     >
       <View style={styles.doneTick}>
         <Text style={[text('sectionHeading'), styles.onInk]}>✓</Text>
@@ -213,6 +236,43 @@ function DoneRow({ workout, logId, durationS, onView }: { workout: WorkoutSummar
       <Text testID={`view-log-${workout.id}`} style={text('sectionHeading')}>
         Summary ›
       </Text>
+    </Pressable>
+  );
+  if (!upNext) return summary;
+  // All done today: the next planned workout sits inside the same card, under a hairline (approved Up next board).
+  return (
+    <View style={[styles.quiet, styles.doneCard, styles.clip]}>
+      {summary}
+      <UpNextRow upNext={upNext} />
+    </View>
+  );
+}
+
+/** "UP NEXT · SATURDAY / Lower · Preview ›": the whole row opens the workout's preview (no Start: it's another day). */
+function UpNextRow({ upNext }: { upNext: UpNext }) {
+  const { text, space } = useTheme();
+  const router = useRouter();
+  const stacked = useStacked();
+  return (
+    <Pressable
+      testID="today-up-next"
+      onPress={() => router.push(previewHref(upNext.id))}
+      accessibilityRole="button"
+      accessibilityLabel={upNext.accessibilityLabel}
+      style={({ pressed }) => [
+        stacked ? styles.upNextStacked : styles.row,
+        styles.hairline,
+        { paddingHorizontal: space[3.5], paddingVertical: space[3], gap: stacked ? space[1] : space[2.5], minHeight: tapTarget.min },
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={stacked ? undefined : styles.flex}>
+        <Text style={styles.upNextLabel}>{upNext.label}</Text>
+        <Text testID="today-up-next-name" style={[text('body'), styles.bold, styles.ink]}>
+          {upNext.name}
+        </Text>
+      </View>
+      <Text style={text('sectionHeading')}>Preview ›</Text>
     </Pressable>
   );
 }
@@ -554,6 +614,17 @@ const styles = StyleSheet.create({
   nextName: { fontSize: 17 },
   outlined: { borderWidth: borderWidth.card, borderColor: palette.ink },
   quiet: { borderWidth: borderWidth.card, borderColor: palette.border },
+  doneCard: { borderRadius: 18 },
+  clip: { overflow: 'hidden' },
+  hairline: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
+  upNextStacked: { flexDirection: 'column', alignItems: 'flex-start' },
+  upNextLabel: {
+    fontFamily: fontFamilyFor('sans', 800),
+    fontSize: typeScale.caption.size.phone,
+    letterSpacing: typeScale.caption.size.phone * 0.04,
+    textTransform: 'uppercase',
+    color: palette.inkMuted,
+  },
   cardTitle: { fontSize: 18 },
   addMeal: {
     minHeight: tapTarget.min,
