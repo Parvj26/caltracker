@@ -254,7 +254,7 @@ export function ExercisesView({
                 )}
                 {shown ? (
                   g.options.length === 0 ? (
-                    <p className={base.caption}>No corrective exercise for this muscle yet. Add your own in Library › Corrective.</p>
+                    <p className={base.caption}>No exercise suggested for this muscle yet.</p>
                   ) : (
                     <ul className={styles.options}>
                       {g.options.map((o) => {

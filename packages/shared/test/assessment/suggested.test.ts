@@ -57,6 +57,10 @@ describe('built-in correctives', () => {
     for (const b of BUILTIN_CORRECTIVES) for (const m of b.muscles) expect(MUSCLE_IDS).toContain(m);
   });
 
+  it('have library names safe for a case-insensitive ilike lookup (no wildcards, quotes, commas or backslashes)', () => {
+    for (const b of BUILTIN_CORRECTIVES) expect(b.libraryName, b.key).not.toMatch(/[%_",\\]/);
+  });
+
   it('reads doses the way the boards write them', () => {
     expect(doseText({ sets: 2, reps: 5, seconds: null, eachSide: true })).toBe('2 × 5 each side');
     expect(doseText({ sets: 2, reps: null, seconds: 30, eachSide: false })).toBe('2 × 30 s');
@@ -109,22 +113,23 @@ describe('buildSuggestedWorkout', () => {
   const calfStretch = builtin('standing_calf_stretch', uuid(7), { trackingType: 'time' });
   const lateralWalk = builtin('banded_lateral_walk', uuid(2), { trackingType: 'weight_reps' });
 
-  it('makes one straight block per pick, in order, sets filled from each default', () => {
+  it('makes one straight block per pick, release / stretch before strengthen, the coach’s own first, sets from each default', () => {
     const groups = exerciseOptions([gluteMed, calves], [dns], [lateralWalk, calfStretch], labels);
     const doc = buildSuggestedWorkout({
       name: suggestedWorkoutName('Vaishali'),
       groups,
+      // Picked built-in first: the coach's own still leads its group.
       picks: [
-        { muscleId: 'glute_medius', status: 'under', exerciseId: uuid(1) },
         { muscleId: 'glute_medius', status: 'under', exerciseId: uuid(2) },
+        { muscleId: 'glute_medius', status: 'under', exerciseId: uuid(1) },
         { muscleId: 'calves', status: 'over', exerciseId: uuid(7) },
       ],
       makeId,
     })!;
     expect(WorkoutDoc.safeParse(doc).success).toBe(true);
     expect(doc.name).toBe('Corrective – Vaishali');
-    expect(doc.blocks.map((b) => b.exercises[0]!.exerciseName)).toEqual(['DNS Star', 'Banded Lateral Walk', 'Calf Stretch Hands Against Wall']);
-    const [first, second, third] = doc.blocks.map((b) => b.exercises[0]!);
+    expect(doc.blocks.map((b) => b.exercises[0]!.exerciseName)).toEqual(['Calf Stretch Hands Against Wall', 'DNS Star', 'Banded Lateral Walk']);
+    const [third, first, second] = doc.blocks.map((b) => b.exercises[0]!);
     expect(first!.sets).toHaveLength(2);
     expect(first!.sets[0]).toMatchObject({ targetRepsMin: 5, targetRepsMax: 5, targetDurationS: null, restSeconds: 45 });
     expect(first!.eachSide).toBe(true);

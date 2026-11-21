@@ -163,9 +163,11 @@ function exerciseFor(choice: CorrectiveChoice, makeId: () => string): WorkoutExe
 }
 
 /**
- * The suggested workout (AS5b): every pick in order (groups in order, then the order picked), each exercise once, as
- * straight sets with sets and reps (or seconds) from its default and 45 s rest. Nothing is saved: it opens in the
- * normal workout builder. Null when nothing is picked.
+ * The suggested workout (AS5b), in the usual corrective order: release / stretch first (possibly overactive muscles),
+ * then activate / strengthen (possibly underactive), each in the groups' order, and within a group the coach's own
+ * exercises before built-ins (the options' order). Each exercise once, as straight sets with sets and reps (or seconds)
+ * from its default and 45 s rest. Nothing is saved: it opens in the normal workout builder. Null when nothing is
+ * picked.
  */
 export function buildSuggestedWorkout(input: {
   name: string;
@@ -175,12 +177,17 @@ export function buildSuggestedWorkout(input: {
 }): WorkoutDoc | null {
   const seen = new Set<string>();
   const blocks: WorkoutBlockDoc[] = [];
-  for (const p of livePicks(input.groups, input.picks)) {
-    if (seen.has(p.exerciseId) || blocks.length >= MAX_BLOCKS) continue;
-    const choice = input.groups.find((g) => g.muscleId === p.muscleId && g.status === p.status)?.options.find((o) => o.exerciseId === p.exerciseId);
-    if (!choice) continue;
-    seen.add(p.exerciseId);
-    blocks.push({ id: input.makeId(), sectionId: null, kind: 'straight', exercises: [exerciseFor(choice, input.makeId)] });
+  const picked = (g: OptionGroup, exerciseId: string) =>
+    input.picks.some((p) => p.muscleId === g.muscleId && p.status === g.status && p.exerciseId === exerciseId);
+  for (const status of ['over', 'under'] as const) {
+    for (const g of input.groups) {
+      if (g.status !== status) continue;
+      for (const choice of g.options) {
+        if (!picked(g, choice.exerciseId) || seen.has(choice.exerciseId) || blocks.length >= MAX_BLOCKS) continue;
+        seen.add(choice.exerciseId);
+        blocks.push({ id: input.makeId(), sectionId: null, kind: 'straight', exercises: [exerciseFor(choice, input.makeId)] });
+      }
+    }
   }
   if (blocks.length === 0) return null;
   return { id: input.makeId(), name: input.name.slice(0, 100), notes: null, sections: [], blocks };

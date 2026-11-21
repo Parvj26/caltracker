@@ -295,6 +295,11 @@ revoke execute on function public.save_assessment_picks(uuid, jsonb) from public
 grant execute on function public.save_assessment_picks(uuid, jsonb) to authenticated;
 
 -- ---------- Photos for the coach's own exercises (existing public bucket, RLS-checked writes) ----------
+-- Now that coaches can write to the public bucket, it takes only pictures, and not big ones: WebP or JPEG, at most 5 MB.
+-- (The importer uploads WebP only; every library picture is well under 5 MB. The app sends ~1600 px WebP/JPEG.)
+update storage.buckets set file_size_limit = 5242880, allowed_mime_types = array['image/webp', 'image/jpeg']
+  where id = 'exercise-images';
+
 -- custom/<workspace id>/<exercise id>/<uuid>.webp|jpg. The case keeps the uuid casts behind the shape check (and
 -- clauses can run in any order). The exercise lookup runs under the caller's RLS; `objects.name` is the file's path
 -- (a bare `name` there would be the exercise's).
