@@ -5,6 +5,9 @@ import {
   ASSESSMENT_NOTE_MAX,
   ASSESSMENT_SLOTS,
   FOOT_ARCHES,
+  checkAlsoCheckIds,
+  checkMarks,
+  checkPicks,
   checkTestEntry,
   movementScore,
   testScore,
@@ -139,6 +142,39 @@ export async function finishAssessment(assessmentId: string): Promise<{ ok: true
   if (error) return failFor(error, 'assessment_finish_failed', 'action:assessments.finish');
   refresh();
   return { ok: true, score: scores.overall };
+}
+
+/**
+ * Findings review (AS4) autosave: the coach's marks and ticked "Also check" items replace what was stored. Only while
+ * the assessment is a draft of a current client (the database refuses anything else, 42501).
+ */
+export async function saveAssessmentReview(assessmentId: string, marks: unknown, checks: unknown): Promise<{ ok: true } | ActionFailure> {
+  await requireCoach();
+  const m = checkMarks(marks);
+  const c = checkAlsoCheckIds(checks);
+  if (!isUuid(assessmentId) || !m || !c) return fail('assessment_invalid', 'action:assessments.saveReview');
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.rpc('save_assessment_review', {
+    p_assessment_id: assessmentId,
+    p_marks: m.map((x) => ({ muscle_id: x.muscleId, side: x.side, status: x.status, review: x.review, sources: x.sources })),
+    p_checks: c,
+  });
+  if (error) return failFor(error, 'assessment_save_failed', 'action:assessments.saveReview');
+  return { ok: true };
+}
+
+/** Exercise picks (AS5) autosave, in order. Allowed after finishing too (the picks remake the suggested workout). */
+export async function saveAssessmentPicks(assessmentId: string, picks: unknown): Promise<{ ok: true } | ActionFailure> {
+  await requireCoach();
+  const p = checkPicks(picks);
+  if (!isUuid(assessmentId) || !p) return fail('assessment_invalid', 'action:assessments.savePicks');
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.rpc('save_assessment_picks', {
+    p_assessment_id: assessmentId,
+    p_picks: p.map((x) => ({ muscle_id: x.muscleId, status: x.status, exercise_id: x.exerciseId })),
+  });
+  if (error) return failFor(error, 'assessment_save_failed', 'action:assessments.savePicks');
+  return { ok: true };
 }
 
 function failFor(

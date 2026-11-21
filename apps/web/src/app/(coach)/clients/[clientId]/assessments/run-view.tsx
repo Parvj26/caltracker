@@ -19,7 +19,7 @@ import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, PhoneActionBar, TextAreaField, TextField } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';
 import calendar from '@/components/calendar/calendar.module.css';
-import { finishAssessment, saveAssessmentTest } from './actions';
+import { saveAssessmentTest } from './actions';
 import type { AssessmentDetail } from './load';
 import { EyeIcon, TestIcon } from './parts';
 import styles from './assessments.module.css';
@@ -135,17 +135,12 @@ export function RunView({ client, assessment, testFromUrl }: { client: { id: str
         go(index + 1);
         return;
       }
-      const outcome = await finishAssessment(assessment.id);
-      if (!outcome.ok) {
-        setSave({ kind: 'error', code: outcome.code });
-        return;
-      }
-      // The same address shows the summary now that it is done. A full load (not the client router, which may still
-      // hold the draft screen for this address) so the summary always comes from the server.
-      window.location.replace(`/clients/${client.id}/assessments/${assessment.id}`);
+      // After the last test: the findings review (AS4). The assessment stays a draft until the coach finishes it there
+      // (Exercises: "Make suggested workout" or "Finish without a workout").
+      router.push(`/clients/${client.id}/assessments/${assessment.id}/findings`);
       return;
     } catch (e) {
-      setSave({ kind: 'error', code: failureCode(e, 'assessment_finish_failed') });
+      setSave({ kind: 'error', code: failureCode(e, 'assessment_save_failed') });
     } finally {
       setMoving(false);
     }
@@ -193,7 +188,7 @@ export function RunView({ client, assessment, testFromUrl }: { client: { id: str
       ) : null}
       <PhoneActionBar status={status ? <span className={styles.statusOk}>{status}</span> : undefined} label="Test actions">
         <Button variant="secondary" onClick={() => void leave('skipped')} disabled={moving} phSafe>Skip test</Button>
-        <Button onClick={() => void leave('done')} pending={moving} phSafe>{last ? 'Finish' : 'Next test'}</Button>
+        <Button onClick={() => void leave('done')} pending={moving} phSafe>{last ? 'Review findings' : 'Next test'}</Button>
       </PhoneActionBar>
     </div>
   );
