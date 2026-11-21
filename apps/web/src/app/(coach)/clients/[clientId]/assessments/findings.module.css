@@ -23,9 +23,9 @@
   .colAlso { grid-area: also; }
   .colMap { grid-area: map; align-self: start; position: sticky; top: var(--ct-space-4); }
 }
-@container findings (min-width: 1100px) {
+@container findings (min-width: 1000px) {
   .layout, .layout[data-tab] {
-    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr) minmax(320px, 400px);
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(300px, 380px);
     grid-template-areas: 'obs sus map' 'also sus map';
     grid-template-rows: auto 1fr;
   }
