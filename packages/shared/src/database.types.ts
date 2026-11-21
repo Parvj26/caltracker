@@ -138,6 +138,32 @@ export type Database = {
           },
         ]
       }
+      assessment_checks: {
+        Row: {
+          assessment_id: string
+          check_id: string
+          workspace_id: string
+        }
+        Insert: {
+          assessment_id: string
+          check_id: string
+          workspace_id: string
+        }
+        Update: {
+          assessment_id?: string
+          check_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_checks_assessment_id_workspace_id_fkey"
+            columns: ["assessment_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
       assessment_cycles: {
         Row: {
           client_id: string
@@ -169,6 +195,48 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessment_exercise_picks: {
+        Row: {
+          assessment_id: string
+          exercise_id: string
+          muscle_id: string
+          position: number
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          assessment_id: string
+          exercise_id: string
+          muscle_id: string
+          position: number
+          status: string
+          workspace_id: string
+        }
+        Update: {
+          assessment_id?: string
+          exercise_id?: string
+          muscle_id?: string
+          position?: number
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_exercise_picks_assessment_id_workspace_id_fkey"
+            columns: ["assessment_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "assessment_exercise_picks_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
             referencedColumns: ["id"]
           },
         ]
@@ -207,6 +275,44 @@ export type Database = {
             columns: ["test_id", "workspace_id"]
             isOneToOne: false
             referencedRelation: "assessment_tests"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      assessment_muscle_marks: {
+        Row: {
+          assessment_id: string
+          muscle_id: string
+          review: string
+          side: string
+          sources: string[]
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          assessment_id: string
+          muscle_id: string
+          review: string
+          side: string
+          sources?: string[]
+          status: string
+          workspace_id: string
+        }
+        Update: {
+          assessment_id?: string
+          muscle_id?: string
+          review?: string
+          side?: string
+          sources?: string[]
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_muscle_marks_assessment_id_workspace_id_fkey"
+            columns: ["assessment_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
             referencedColumns: ["id", "workspace_id"]
           },
         ]
@@ -1653,6 +1759,92 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      corrective_exercise_muscles: {
+        Row: {
+          corrective_id: string
+          muscle_id: string
+          side: string
+          workspace_id: string
+        }
+        Insert: {
+          corrective_id: string
+          muscle_id: string
+          side: string
+          workspace_id: string
+        }
+        Update: {
+          corrective_id?: string
+          muscle_id?: string
+          side?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrective_exercise_muscles_corrective_id_workspace_id_fkey"
+            columns: ["corrective_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "corrective_exercises"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      corrective_exercises: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          default_reps: number | null
+          default_seconds: number | null
+          default_sets: number
+          direction: string
+          each_side: boolean
+          exercise_id: string
+          id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          default_reps?: number | null
+          default_seconds?: number | null
+          default_sets?: number
+          direction: string
+          each_side?: boolean
+          exercise_id: string
+          id?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          default_reps?: number | null
+          default_seconds?: number | null
+          default_sets?: number
+          direction?: string
+          each_side?: boolean
+          exercise_id?: string
+          id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrective_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "corrective_exercises_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3899,6 +4091,14 @@ export type Database = {
         Args: { p_community_id: string; p_user_id: string }
         Returns: undefined
       }
+      save_assessment_picks: {
+        Args: { p_assessment_id: string; p_picks: Json }
+        Returns: undefined
+      }
+      save_assessment_review: {
+        Args: { p_assessment_id: string; p_checks: Json; p_marks: Json }
+        Returns: undefined
+      }
       save_assessment_test: {
         Args: {
           p_discomfort_left: boolean
@@ -3915,6 +4115,20 @@ export type Database = {
         Returns: undefined
       }
       save_body_measurement: { Args: { p: Json }; Returns: string }
+      save_corrective_exercise: {
+        Args: {
+          p_direction: string
+          p_each_side: boolean
+          p_exercise_id: string
+          p_id: string
+          p_muscles: Json
+          p_reps: number
+          p_seconds: number
+          p_sets: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       save_workout: {
         Args: { p_doc: Json; p_workspace_id: string }
         Returns: string

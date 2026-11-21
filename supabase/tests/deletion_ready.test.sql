@@ -1,5 +1,5 @@
 begin;
-select plan(55);
+select plan(56);
 
 -- Account deletion (Apple requires it in the app). The delete-account Edge Function removes the client's files
 -- through the Storage API, then deletes the auth user; this file proves the database half: deleting the auth user
@@ -46,6 +46,7 @@ select is(
     'community_reports(target_author_id)>auth.users:c',
     'conversation_reads(user_id)>auth.users:c',
     'conversations(client_id)>auth.users:c',
+    'corrective_exercises(created_by)>auth.users:n',
     'exercise_favorites(coach_id)>auth.users:c',
     'exercises(created_by)>auth.users:n',
     'meals(client_id)>auth.users:c',
@@ -198,6 +199,14 @@ insert into public.assessment_checkpoint_results (test_id, workspace_id, checkpo
 values (:'vic_test', :'ws', 'shm.shoulder_hike', 'L', 'slight');
 insert into public.assessment_measure_results (test_id, workspace_id, measure_id, side, value, unit, higher_is_better)
 values (:'vic_test', :'ws', 'shm.reach_gap', 'L', 14, 'cm', false);
+-- Step 2: a muscle mark, a ticked check and a pick on it, and a corrective exercise the coach tagged.
+insert into public.assessment_muscle_marks (assessment_id, workspace_id, muscle_id, side, status, review, sources)
+values (:'vic_assessment', :'ws', 'upper_traps', 'L', 'over', 'confirmed', '{shm.shoulder_hike}');
+insert into public.assessment_checks (assessment_id, workspace_id, check_id) values (:'vic_assessment', :'ws', 'upper_back_mobility');
+insert into public.corrective_exercises (workspace_id, exercise_id, direction, created_by)
+values (:'ws', (select id from public.exercises where workspace_id = :'ws' limit 1), 'over', :'coach') returning id as vic_corrective \gset
+insert into public.assessment_exercise_picks (assessment_id, workspace_id, muscle_id, status, exercise_id, position)
+values (:'vic_assessment', :'ws', 'upper_traps', 'over', (select exercise_id from public.corrective_exercises where id = :'vic_corrective'), 0);
 
 -- Food: a meal from the coach's list, a photo meal, and targets.
 insert into public.meals (workspace_id, client_id, eaten_on, name, calories, coach_meal_id)
@@ -361,8 +370,13 @@ select is((select count(*)::int from public.meals where coach_meal_id = :'coach_
 select is((select count(*)::int from public.client_notes where body = 'Note'), 0, 'the coach''s notes about Vic are gone');
 select is((select count(*)::int from public.assessment_tests where id = :'vic_test')
   + (select count(*)::int from public.assessment_checkpoint_results where test_id = :'vic_test')
-  + (select count(*)::int from public.assessment_measure_results where test_id = :'vic_test'), 0,
-  'Vic''s assessment tests, ratings and numbers are gone');
+  + (select count(*)::int from public.assessment_measure_results where test_id = :'vic_test')
+  + (select count(*)::int from public.assessment_muscle_marks where assessment_id = :'vic_assessment')
+  + (select count(*)::int from public.assessment_checks where assessment_id = :'vic_assessment')
+  + (select count(*)::int from public.assessment_exercise_picks where assessment_id = :'vic_assessment'), 0,
+  'Vic''s assessment tests, ratings, numbers, muscle marks, checks and picks are gone');
+select is((select count(*)::int from public.corrective_exercises where id = :'vic_corrective'), 1,
+  'the coach''s corrective exercise stays');
 select is((select count(*)::int from auth.identities where user_id = :'vic'), 0, 'Vic''s sign-in identity is gone');
 
 -- ---------- Everyone else is untouched ----------

@@ -283,5 +283,617 @@
       "Jump back to the right. Each jump counts as one rep."
     ],
     "images": []
+  },
+  {
+    "id": "caltracker:knee-to-wall-ankle-mobilization",
+    "name": "Knee-to-Wall Ankle Mobilization",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["calves"],
+    "secondaryMuscles": [],
+    "category": "stretching",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand facing a wall in a split stance, front toes a few centimetres from the wall.",
+      "Keep the front heel down and drive the front knee forward to touch the wall.",
+      "Hold for 2 seconds at the end, then return. Move the foot back as it gets easier."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:bent-knee-calf-stretch",
+    "name": "Bent-Knee Calf Stretch",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["calves"],
+    "secondaryMuscles": [],
+    "category": "stretching",
+    "trackingType": "time",
+    "instructions": [
+      "Stand facing a wall with one foot behind the other, hands on the wall.",
+      "Bend both knees and sink down, keeping the back heel on the floor.",
+      "Hold where you feel the stretch low in the back calf, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:half-kneeling-adductor-stretch",
+    "name": "Half-Kneeling Adductor Stretch",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["adductors"],
+    "secondaryMuscles": [],
+    "category": "stretching",
+    "trackingType": "time",
+    "instructions": [
+      "Kneel on one knee and take the other leg straight out to the side, foot flat.",
+      "Keep your chest tall and shift your hips gently away from the straight leg.",
+      "Hold where you feel the stretch along the inner thigh, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:supine-hamstring-stretch",
+    "name": "Supine Hamstring Stretch",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "bands",
+    "primaryMuscles": ["hamstrings"],
+    "secondaryMuscles": ["calves"],
+    "category": "stretching",
+    "trackingType": "time",
+    "instructions": [
+      "Lie on your back and loop a band or towel around one foot.",
+      "Keep the leg straight and pull it up until you feel a stretch behind the thigh.",
+      "Keep the other leg flat on the floor. Hold, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:doorway-pec-stretch",
+    "name": "Doorway Pec Stretch",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["chest"],
+    "secondaryMuscles": ["shoulders"],
+    "category": "stretching",
+    "trackingType": "time",
+    "instructions": [
+      "Stand in a doorway with forearms on the frame, elbows at shoulder height.",
+      "Step one foot through and lean forward gently until you feel a stretch across the chest.",
+      "Keep your ribs down and hold without arching your low back."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:kneeling-lat-stretch",
+    "name": "Kneeling Lat Stretch",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["lats"],
+    "secondaryMuscles": ["shoulders"],
+    "category": "stretching",
+    "trackingType": "time",
+    "instructions": [
+      "Kneel facing a bench or chair and rest your forearms or hands on it.",
+      "Sit your hips back towards your heels and let your chest sink down.",
+      "Hold where you feel the stretch along the sides of your back."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:thoracic-extension-on-foam-roller",
+    "name": "Thoracic Extension on Foam Roller",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "foam roll",
+    "primaryMuscles": ["middle back"],
+    "secondaryMuscles": ["lats"],
+    "category": "stretching",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie back over a foam roller placed across your upper back, hands behind your head.",
+      "Keep your hips on the floor and gently extend your upper back over the roller.",
+      "Return, then move the roller a few centimetres and repeat. Avoid the low back."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:open-book",
+    "name": "Open Book",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["middle back"],
+    "secondaryMuscles": ["chest"],
+    "category": "stretching",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your side, knees bent to 90 degrees, arms straight out in front together.",
+      "Keep your knees together and open the top arm across your body towards the floor behind you.",
+      "Follow your hand with your eyes, pause, then close the book. Do all reps, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:cross-body-stretch",
+    "name": "Cross-Body Stretch",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["shoulders"],
+    "secondaryMuscles": [],
+    "category": "stretching",
+    "trackingType": "time",
+    "instructions": [
+      "Bring one arm across your chest at shoulder height.",
+      "Use the other hand above the elbow to pull it gently closer.",
+      "Keep the shoulder down away from your ear. Hold, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:sleeper-stretch",
+    "name": "Sleeper Stretch",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["shoulders"],
+    "secondaryMuscles": [],
+    "category": "stretching",
+    "trackingType": "time",
+    "instructions": [
+      "Lie on your side with the bottom arm out in front, elbow bent to 90 degrees.",
+      "Use the top hand to gently press the bottom forearm down towards the floor.",
+      "Stop at a gentle stretch at the back of the shoulder; never push into pain."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:banded-lateral-walk",
+    "name": "Banded Lateral Walk",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "bands",
+    "primaryMuscles": ["glutes"],
+    "secondaryMuscles": ["abductors"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Place a band around your legs just above the knees or at the ankles.",
+      "Sit into a slight squat and step sideways, keeping the knees pushed out against the band.",
+      "Keep your trunk still and toes forward. Step the same number of times each way."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:side-lying-hip-abduction",
+    "name": "Side-Lying Hip Abduction",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["abductors"],
+    "secondaryMuscles": ["glutes"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your side with the bottom knee bent and the top leg straight.",
+      "Lift the top leg up and slightly back, toes pointing forward, without rolling your hips back.",
+      "Lower slowly. Do all reps, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:clamshell",
+    "name": "Clamshell",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "bands",
+    "primaryMuscles": ["glutes"],
+    "secondaryMuscles": ["abductors"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your side with hips and knees bent and feet together.",
+      "Keep the feet touching and lift the top knee, without rolling your pelvis back.",
+      "Lower slowly. Add a band above the knees to make it harder."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:glute-bridge",
+    "name": "Glute Bridge",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["glutes"],
+    "secondaryMuscles": ["hamstrings"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your back with knees bent and feet flat, hip-width apart.",
+      "Squeeze your glutes and lift your hips until your body is in a line from knees to shoulders.",
+      "Pause at the top, then lower slowly without arching your low back."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:step-down",
+    "name": "Step-Down",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "body only",
+    "primaryMuscles": ["quadriceps"],
+    "secondaryMuscles": ["glutes"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand on a low step on one leg, the other foot hanging off the side.",
+      "Slowly bend the standing knee and lower the other heel to tap the floor, knee over the middle of the foot.",
+      "Push back up through the standing leg. Do all reps, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:single-leg-romanian-deadlift",
+    "name": "Single-Leg Romanian Deadlift",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "dumbbell",
+    "primaryMuscles": ["hamstrings"],
+    "secondaryMuscles": ["glutes", "lower back"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand on one leg holding a weight, standing knee slightly bent.",
+      "Hinge at the hip, reaching the weight down as the free leg goes back, hips level.",
+      "Stop when you feel the hamstring stretch and stand back up. Switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:heel-elevated-goblet-squat",
+    "name": "Heel-Elevated Goblet Squat",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "dumbbell",
+    "primaryMuscles": ["quadriceps"],
+    "secondaryMuscles": ["glutes"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand with your heels on a small plate or wedge, holding a weight at your chest.",
+      "Squat down between your legs, keeping the chest up and knees over the toes.",
+      "Drive back up through the whole foot."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:dowel-hip-hinge",
+    "name": "Dowel Hip Hinge",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "other",
+    "primaryMuscles": ["hamstrings"],
+    "secondaryMuscles": ["glutes", "lower back"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Hold a dowel along your back so it touches your head, upper back and tailbone.",
+      "Push your hips back with soft knees, keeping all three points on the dowel.",
+      "Stand back up by driving your hips forward."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:quadruped-rock-back",
+    "name": "Quadruped Rock Back",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["glutes"],
+    "secondaryMuscles": ["lower back"],
+    "category": "stretching",
+    "trackingType": "reps",
+    "instructions": [
+      "Start on hands and knees with a flat back.",
+      "Rock your hips back towards your heels as far as you can without your low back rounding.",
+      "Return to the start and repeat slowly."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:bird-dog",
+    "name": "Bird Dog",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["lower back"],
+    "secondaryMuscles": ["glutes", "abdominals"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Start on hands and knees with a flat back.",
+      "Reach one arm forward and the opposite leg back until both are level with your body.",
+      "Hold for a few seconds without your hips tipping, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:suitcase-carry",
+    "name": "Suitcase Carry",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "kettlebells",
+    "primaryMuscles": ["abdominals"],
+    "secondaryMuscles": ["forearms", "glutes"],
+    "category": "strength",
+    "trackingType": "distance",
+    "instructions": [
+      "Hold a heavy weight in one hand by your side.",
+      "Walk tall without leaning towards or away from the weight.",
+      "Walk the distance, then switch hands."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:active-leg-lowering",
+    "name": "Active Leg Lowering",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["abdominals"],
+    "secondaryMuscles": ["hamstrings"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your back with both legs pointing straight up.",
+      "Keep your low back on the floor and slowly lower one leg towards the floor.",
+      "Bring it back up and switch legs."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:nordic-hamstring-curl",
+    "name": "Nordic Hamstring Curl",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["hamstrings"],
+    "secondaryMuscles": ["glutes"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Kneel with your ankles held down by a partner or a fixed bar.",
+      "Keeping a straight line from knees to head, lower yourself forward as slowly as you can.",
+      "Catch yourself with your hands and push back up to the start."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:short-foot-exercise",
+    "name": "Short Foot Exercise",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["calves"],
+    "secondaryMuscles": [],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Sit or stand with your foot flat on the floor.",
+      "Shorten the foot by pulling the ball of the foot towards the heel, lifting the arch without curling the toes.",
+      "Hold for 5 seconds, then relax."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:single-leg-balance",
+    "name": "Single-Leg Balance",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["calves"],
+    "secondaryMuscles": ["glutes"],
+    "category": "strength",
+    "trackingType": "time",
+    "instructions": [
+      "Stand on one leg with a soft knee, the other foot off the floor.",
+      "Keep your hips level and your foot steady.",
+      "Hold for the time, then switch sides. Close your eyes to make it harder."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:single-leg-balance-with-reach",
+    "name": "Single-Leg Balance with Reach",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["glutes"],
+    "secondaryMuscles": ["quadriceps", "calves"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand on one leg with a soft knee.",
+      "Reach the other foot forward, to the side and behind as far as you can while staying balanced.",
+      "Return to the middle each time. Switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:push-up-plus",
+    "name": "Push-Up Plus",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["chest"],
+    "secondaryMuscles": ["shoulders"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Start in a push-up position (on knees or toes).",
+      "Do a push-up, then at the top push the floor away further so the shoulder blades spread apart.",
+      "Lower the shoulder blades back and repeat."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:supine-dumbbell-serratus-punch",
+    "name": "Supine Dumbbell Serratus Punch",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "dumbbell",
+    "primaryMuscles": ["chest"],
+    "secondaryMuscles": ["shoulders"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your back holding a light dumbbell straight up over your shoulder.",
+      "Keep the elbow straight and punch the weight towards the ceiling, lifting the shoulder blade off the floor.",
+      "Lower the shoulder blade back down slowly."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:wall-slide",
+    "name": "Wall Slide",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["shoulders"],
+    "secondaryMuscles": ["traps"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Stand with your back against a wall, forearms on the wall in a goalpost position.",
+      "Slide your arms up the wall as far as you can while keeping your low back and forearms on the wall.",
+      "Slide back down slowly."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:prone-y-raise",
+    "name": "Prone Y Raise",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["traps"],
+    "secondaryMuscles": ["shoulders"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie face down with arms overhead in a Y shape, thumbs up.",
+      "Lift your arms off the floor by drawing your shoulder blades down and back.",
+      "Hold for 2 seconds, then lower."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:prone-t-raise-thumbs-up",
+    "name": "Prone T Raise (Thumbs Up)",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["middle back"],
+    "secondaryMuscles": ["shoulders", "traps"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie face down with arms straight out to the sides, thumbs up.",
+      "Lift your arms off the floor by squeezing your shoulder blades together.",
+      "Hold for 2 seconds, then lower."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:side-lying-external-rotation",
+    "name": "Side-Lying External Rotation",
+    "force": "pull",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "dumbbell",
+    "primaryMuscles": ["shoulders"],
+    "secondaryMuscles": [],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Lie on your side with the top elbow bent to 90 degrees and tucked against your side.",
+      "Holding a light dumbbell, rotate the forearm up towards the ceiling, keeping the elbow in place.",
+      "Lower slowly. Do all reps, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:half-kneeling-landmine-press",
+    "name": "Half-Kneeling Landmine Press",
+    "force": "push",
+    "level": "beginner",
+    "mechanic": "compound",
+    "equipment": "barbell",
+    "primaryMuscles": ["shoulders"],
+    "secondaryMuscles": ["chest", "triceps"],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Kneel on one knee holding the end of a landmine bar at your shoulder on the same side as the down knee.",
+      "Press the bar up and forward until the arm is straight, letting the shoulder blade move forward.",
+      "Lower under control. Do all reps, then switch sides."
+    ],
+    "images": []
+  },
+  {
+    "id": "caltracker:chin-tuck",
+    "name": "Chin Tuck",
+    "force": "static",
+    "level": "beginner",
+    "mechanic": "isolation",
+    "equipment": "body only",
+    "primaryMuscles": ["neck"],
+    "secondaryMuscles": [],
+    "category": "strength",
+    "trackingType": "reps",
+    "instructions": [
+      "Sit or stand tall, looking straight ahead.",
+      "Glide your chin straight back, making a double chin, without tilting your head down.",
+      "Hold for a few seconds, then relax."
+    ],
+    "images": []
   }
 ]

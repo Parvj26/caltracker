@@ -18,12 +18,12 @@ select is(
    join pg_tables t on t.schemaname = 'public' and t.tablename = c.table_name
    where c.table_schema = 'public' and c.column_name = 'workspace_id'),
   array[
-    'assessment_checkpoint_results', 'assessment_cycles', 'assessment_measure_results', 'assessment_test_definitions',
-    'assessment_tests', 'assessments',
+    'assessment_checkpoint_results', 'assessment_checks', 'assessment_cycles', 'assessment_exercise_picks',
+    'assessment_measure_results', 'assessment_muscle_marks', 'assessment_test_definitions', 'assessment_tests', 'assessments',
     'award_bonus_queue', 'awards', 'body_measurements', 'body_metrics', 'client_documents', 'client_flags', 'client_goals', 'client_invite_plan_items', 'client_invites',
     'client_limitations', 'client_notes', 'client_stats', 'coach_meals', 'communities', 'community_blocks',
     'community_comments', 'community_members', 'community_notifications', 'community_post_images', 'community_posts',
-    'community_reactions', 'community_reports', 'conversations', 'custom_metrics', 'exercise_overrides', 'exercise_prefs',
+    'community_reactions', 'community_reports', 'conversations', 'corrective_exercise_muscles', 'corrective_exercises', 'custom_metrics', 'exercise_overrides', 'exercise_prefs',
     'exercises', 'live_sync_tombstones', 'log_blocks', 'log_exercises', 'log_sets', 'meals', 'messages', 'nutrition_targets',
     'past_clients', 'personal_records', 'program_assignments', 'program_workouts', 'programs', 'push_outbox',
     'sticker_awards', 'workout_blocks', 'workout_exercises', 'workout_log_comments', 'workout_logs', 'workout_sets',
@@ -49,8 +49,9 @@ select is(
        select 1 from pg_constraint k join pg_attribute a on a.attrelid = k.conrelid and a.attnum = any(k.conkey)
        where k.contype = 'f' and k.conrelid = to_regclass('public.' || quote_ident(c.table_name))
          and a.attname = 'workspace_id' and k.confrelid = 'public.workspaces'::regclass)),
-  array['assessment_checkpoint_results', 'assessment_measure_results', 'assessment_tests',
-        'community_members', 'community_post_images', 'community_posts', 'log_blocks', 'log_exercises', 'log_sets',
+  array['assessment_checkpoint_results', 'assessment_checks', 'assessment_exercise_picks', 'assessment_measure_results',
+        'assessment_muscle_marks', 'assessment_tests',
+        'community_members', 'community_post_images', 'community_posts', 'corrective_exercise_muscles', 'log_blocks', 'log_exercises', 'log_sets',
         'program_workouts', 'workout_blocks', 'workout_exercises', 'workout_log_comments', 'workout_sets',
         'workout_substitutes']::text[] collate "C",
   'workspace_id columns without their own key to workspaces are on the reviewed list');
@@ -232,6 +233,9 @@ insert into public.exercise_prefs (workspace_id, exercise_id, tracking_type, eac
 insert into public.coach_meals (workspace_id, name, calories, created_by)
 values (:'ws', 'AC Oats', 400, :'coach') returning id as coach_meal \gset
 insert into public.custom_metrics (workspace_id, name, min, max) values (:'ws', 'Waist', 15, 80);
+insert into public.corrective_exercises (workspace_id, exercise_id, direction, created_by) values (:'ws', :'coach_ex', 'under', :'coach')
+  returning id as corrective \gset
+insert into public.corrective_exercise_muscles (corrective_id, workspace_id, muscle_id, side) values (:'corrective', :'ws', 'glute_medius', 'L');
 insert into public.client_invite_plan_items (invite_id, workspace_id, program_id, start_on)
 values (:'inv_pending', :'ws', :'prog', current_date);
 
