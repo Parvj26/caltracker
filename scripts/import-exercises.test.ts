@@ -9,6 +9,7 @@ import { exerciseImageObjectPath, thumbPathOf, type Database, type FreeExercise 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PINNED_SHA, importExercises } from './import-exercises';
 import { loadManifest } from './exercise-images';
+import { loadOwnImages, ownImageObjectPaths } from './caltracker-exercise-images';
 
 const admin = createClient<Database>(
   process.env.SUPABASE_URL!,
@@ -92,7 +93,7 @@ describe('importExercises', () => {
     expect(thumb.data?.type).toBe('image/webp');
   });
 
-  it('upserts the CalTracker extras once as built-ins, without pictures when their match is not in the import', async () => {
+  it('upserts the CalTracker extras once as built-ins: own pictures where CalTracker has them, else none when their match is not in the import', async () => {
     const extras = JSON.parse(
       await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), 'caltracker-extra-exercises.json'), 'utf8'),
     ) as { id: string; trackingType: string }[];
@@ -104,7 +105,12 @@ describe('importExercises', () => {
       .like('external_id', 'caltracker:%');
     expect(error).toBeNull();
     expect(data).toHaveLength(15);
-    expect(data!.every((r) => r.source === 'builtin' && r.workspace_id === null && r.image_paths.length === 0)).toBe(true);
+    expect(data!.every((r) => r.source === 'builtin' && r.workspace_id === null)).toBe(true);
+    const own = await loadOwnImages();
+    for (const r of data!) {
+      const entry = own.exercises[r.external_id!];
+      expect(r.image_paths, r.external_id!).toEqual(entry ? ownImageObjectPaths(entry) : []);
+    }
     const pull = data!.find((r) => r.external_id === 'caltracker:machine-assisted-pull-up');
     expect(pull?.tracking_type).toBe(extras.find((e) => e.id === pull?.external_id)?.trackingType);
   });
@@ -155,20 +161,44 @@ describe('importExercises', () => {
     }
   });
 
+  it('uploads CalTracker\'s own pictures once, each with a thumbnail', async () => {
+    const own = await loadOwnImages();
+    const paths = Object.entries(own.exercises).filter(([id]) => id.startsWith('caltracker:')).flatMap(([, e]) => ownImageObjectPaths(e));
+    await admin.storage.from('exercise-images').remove(paths.flatMap((p) => [p, thumbPathOf(p)]));
+    const first = await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
+    const second = await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
+    expect(first.imagesFailed + second.imagesFailed).toBe(0);
+    expect(first.ownImagesUploaded).toBe(paths.length);
+    expect(second.ownImagesUploaded).toBe(0);
+    expect(second.ownImagesSkipped).toBe(paths.length);
+    for (const p of [paths[0]!, thumbPathOf(paths[0]!)]) {
+      const file = await admin.storage.from('exercise-images').download(p);
+      expect(file.data?.type).toBe('image/webp');
+    }
+  });
+
+  it('refuses an exercise with both its own pictures and free-exercise-db pictures', async () => {
+    const real = await loadManifest();
+    const manifestFile = path.join(subsetDir, 'both-manifest.json');
+    const manifest = { ...real, exercises: { ...real.exercises, 'caltracker:burpee': { ...real.exercises.Barbell_Squat!, match: 'alias' } } };
+    await writeFile(manifestFile, JSON.stringify(manifest));
+    await expect(importExercises(admin, { fixtureDir: subsetDir, manifestFile, log: quiet })).rejects.toThrow(/both its own pictures/);
+  });
+
   it('gives a CalTracker extra the pictures of its alias match', async () => {
     const real = await loadManifest();
     const manifestFile = path.join(subsetDir, 'manifest.json');
     const squat = real.exercises.Barbell_Squat!;
-    const manifest = { ...real, exercises: { ...real.exercises, 'caltracker:kettlebell-sumo-squat': { ...squat, match: 'alias' } } };
+    const manifest = { ...real, exercises: { ...real.exercises, 'caltracker:dumbbell-walking-lunge': { ...squat, match: 'alias' } } };
     await writeFile(manifestFile, JSON.stringify(manifest));
     try {
       await importExercises(admin, { fixtureDir: subsetDir, manifestFile, log: quiet });
-      const { data } = await admin.from('exercises').select('image_paths').eq('external_id', 'caltracker:kettlebell-sumo-squat').single();
+      const { data } = await admin.from('exercises').select('image_paths').eq('external_id', 'caltracker:dumbbell-walking-lunge').single();
       expect(data?.image_paths).toEqual(squat.images.map((i) => exerciseImageObjectPath(i.path)));
     } finally {
       await importExercises(admin, { fixtureDir: subsetDir, log: quiet });
     }
-    const { data } = await admin.from('exercises').select('image_paths').eq('external_id', 'caltracker:kettlebell-sumo-squat').single();
+    const { data } = await admin.from('exercises').select('image_paths').eq('external_id', 'caltracker:dumbbell-walking-lunge').single();
     expect(data?.image_paths).toEqual([]);
   });
 });

@@ -1,0 +1,20 @@
+{
+  "licence": "Owned by CalTracker (illustrations made for the product)",
+  "exercises": {
+    "caltracker:bear-crawl": { "name": "Bear Crawl", "folder": "bear-crawl" },
+    "caltracker:burpee": { "name": "Burpee", "folder": "burpee" },
+    "caltracker:jumping-jack": { "name": "Jumping Jack", "folder": "jumping-jack" },
+    "caltracker:high-knees": { "name": "High Knees", "folder": "high-knees" },
+    "Kettlebell_Halo": { "name": "Kettlebell Halo", "folder": "kettlebell-halo" },
+    "Kettlebell_Halo_With_Overhead_Extension": { "name": "Kettlebell Halo with Overhead Extension", "folder": "kettlebell-halo-with-overhead-extension" },
+    "caltracker:crunch-clap": { "name": "Crunch Clap", "folder": "crunch-clap" },
+    "caltracker:side-plank-single-leg-crunch": { "name": "Side Plank Single Leg Crunch", "folder": "side-plank-single-leg-crunch" },
+    "caltracker:kettlebell-sumo-squat": { "name": "Kettlebell Sumo Squat", "folder": "kettlebell-sumo-squat" },
+    "caltracker:kettlebell-upright-row": { "name": "Kettlebell Upright Row", "folder": "kettlebell-upright-row" },
+    "caltracker:machine-assisted-pull-up": { "name": "Machine Assisted Pull Up", "folder": "machine-assisted-pull-up" },
+    "caltracker:hip-thrust-machine": { "name": "Hip Thrust Machine", "folder": "hip-thrust-machine" },
+    "caltracker:medicine-ball-russian-twist": { "name": "Medicine Ball Russian Twist", "folder": "medicine-ball-russian-twist" },
+    "Kettlebell_Overhead_Triceps_Extension": { "name": "Kettlebell Overhead Triceps Extension", "folder": "kettlebell-overhead-triceps-extension" },
+    "caltracker:skater-jump": { "name": "Skater Jump", "folder": "skater-jump" }
+  }
+}

@@ -14007,86 +14007,6 @@
     }
    ]
   },
-  "caltracker:hip-thrust-machine": {
-   "match": "alias",
-   "sourceId": "Barbell_Hip_Thrust",
-   "images": [
-    {
-     "path": "Barbell_Hip_Thrust/0.jpg",
-     "sha256": "b2c82d4647df0621e2b0568f383d14e9577f2baa458668233c86d2f738efd4c1",
-     "licence": "Unlicense"
-    },
-    {
-     "path": "Barbell_Hip_Thrust/1.jpg",
-     "sha256": "de1a6390ff4b2720750ed3380c3c9b0c4c1fb5ae811810291b62d8a1fd726ad6",
-     "licence": "Unlicense"
-    }
-   ]
-  },
-  "caltracker:kettlebell-sumo-squat": {
-   "match": "alias",
-   "sourceId": "Plie_Dumbbell_Squat",
-   "images": [
-    {
-     "path": "Plie_Dumbbell_Squat/0.jpg",
-     "sha256": "f72c3df6c5948892f4c5243ed85c947169a17b51e6aefc41635a4c265320b2bf",
-     "licence": "Unlicense"
-    },
-    {
-     "path": "Plie_Dumbbell_Squat/1.jpg",
-     "sha256": "55bc6d4f0b3b2121a2f3c00244471faf32a538db910610f2f7886332fc5562f3",
-     "licence": "Unlicense"
-    }
-   ]
-  },
-  "caltracker:kettlebell-upright-row": {
-   "match": "alias",
-   "sourceId": "Standing_Dumbbell_Upright_Row",
-   "images": [
-    {
-     "path": "Standing_Dumbbell_Upright_Row/0.jpg",
-     "sha256": "d236b7eb88d46f826fdd480c8ac671d2d600516e7127e459880cf9d9e006e7fc",
-     "licence": "Unlicense"
-    },
-    {
-     "path": "Standing_Dumbbell_Upright_Row/1.jpg",
-     "sha256": "7a329816fdbe96c8d208747cab069a55217980247728096cce380aeedb1c5335",
-     "licence": "Unlicense"
-    }
-   ]
-  },
-  "caltracker:machine-assisted-pull-up": {
-   "match": "alias",
-   "sourceId": "Band_Assisted_Pull-Up",
-   "images": [
-    {
-     "path": "Band_Assisted_Pull-Up/0.jpg",
-     "sha256": "7af060c6c064e6e8a074add38c950dc59f93801ecd54b7d652172bd9800b034d",
-     "licence": "Unlicense"
-    },
-    {
-     "path": "Band_Assisted_Pull-Up/1.jpg",
-     "sha256": "edc82e3a48ec624be2b920262d99399d055b96333850579b22fefa7375768a30",
-     "licence": "Unlicense"
-    }
-   ]
-  },
-  "caltracker:medicine-ball-russian-twist": {
-   "match": "alias",
-   "sourceId": "Russian_Twist",
-   "images": [
-    {
-     "path": "Russian_Twist/0.jpg",
-     "sha256": "e82f47fe7f7f9ba5c75e56b751d357f6e78eb3a5adba4da3aef8df44dfa7234f",
-     "licence": "Unlicense"
-    },
-    {
-     "path": "Russian_Twist/1.jpg",
-     "sha256": "7942e01c08ff47f71deea024bd6ed8d4766818d58229547770f22988b03c8da6",
-     "licence": "Unlicense"
-    }
-   ]
-  },
   "caltracker:medicine-ball-sit-up-and-overhead-throw": {
    "match": "alias",
    "sourceId": "Supine_Two-Arm_Overhead_Throw",
@@ -14099,22 +14019,6 @@
     {
      "path": "Supine_Two-Arm_Overhead_Throw/1.jpg",
      "sha256": "f02ea0a641ff43ddab6bdac4ba767f92be474609926e8b2675a142d8c5b05a9b",
-     "licence": "Unlicense"
-    }
-   ]
-  },
-  "caltracker:skater-jump": {
-   "match": "alias",
-   "sourceId": "Lateral_Bound",
-   "images": [
-    {
-     "path": "Lateral_Bound/0.jpg",
-     "sha256": "0cfa2c12cae9bf09b005a8c68dae109060495e8c8ddca53f229cc0b973b3d653",
-     "licence": "Unlicense"
-    },
-    {
-     "path": "Lateral_Bound/1.jpg",
-     "sha256": "aed75d51ea6b9ebc85bd4517fb85a94df26a276ddd617f491c56d8d40c5b0110",
      "licence": "Unlicense"
     }
    ]
