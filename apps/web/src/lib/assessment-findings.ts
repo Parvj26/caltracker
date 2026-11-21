@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   BUILTIN_CORRECTIVES,
-  checkpointsOf,
+  checkpointLabelMap,
   confirmedMarks,
   isMuscleId,
   markStates,
@@ -130,16 +130,10 @@ export async function loadCorrectiveChoices(supabase: Supabase, workspaceId: str
   return { coach, builtins };
 }
 
-/** Checkpoint id → the words the coach saw ("Knees cave in"), from the assessment's own definition copies. */
+/** Checkpoint id → the words the coach saw ("Knees cave in"), from the assessment's own definition copies (same-sounding
+ * findings of two tests get the test's name: "Knees cave in · Overhead squat"). */
 export function checkpointLabels(definitions: readonly TestDefinition[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const d of definitions) {
-    for (const c of checkpointsOf(d)) {
-      const label = c.finding ?? c.label;
-      out[c.id] = d.kind === 'record_only' ? `${label} · posture` : label;
-    }
-  }
-  return out;
+  return checkpointLabelMap(definitions);
 }
 
 /** One confirmed finding row for the report: a muscle group, its status, its sides and where it came from. */

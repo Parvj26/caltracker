@@ -4,7 +4,7 @@ export { SCORE_BANDS, checkpointsOf, movementScore, scoreBand, testScore } from 
 export type { NotScored, ScoreBand, ScoreInput, TestScore } from './score';
 export { RETEST_INTERVAL_DAYS, SLOT_LABELS, canStart, cycleView } from './cycle';
 export type { AssessmentSummary, CycleSummary, CycleView, SlotState } from './cycle';
-export { findingChips, observedFindings } from './findings';
+export { checkpointLabelMap, findingChips, observedFindings } from './findings';
 export type { Finding, FindingChip, FindingSide, FindingsInput } from './findings';
 export { compareAssessments, findingChange, formatMeasureDelta, formatMeasureValue, formatScoreDelta, measureChange, orderColumnPicks } from './compare';
 export type {
