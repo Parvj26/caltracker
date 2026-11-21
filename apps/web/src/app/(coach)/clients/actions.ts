@@ -199,6 +199,11 @@ export type ChangeEmailOutcome =
       planError: ErrorCode | null;
       /** False when the old invite couldn't be cancelled: its link may still work. */
       oldCancelled: boolean;
+      /**
+       * Why the old invite was kept (with its plan) although the new one went out: the new one couldn't be looked up,
+       * or its plan couldn't be copied. Null when it moved.
+       */
+      keptOld: 'lookup' | 'plan' | null;
     };
 
 /**
@@ -227,7 +232,7 @@ export async function changeInviteEmail(input: { inviteId: string; email: string
   if (!sent.ok) return sent;
   const result = sent.results[0];
   if (!result) return fail('invite_send_failed', 'action:clients.changeInviteEmail');
-  if (!INVITE_OPEN.has(result.status)) return { ok: true, result, inviteId: null, planError: null, oldCancelled: false };
+  if (!INVITE_OPEN.has(result.status)) return { ok: true, result, inviteId: null, planError: null, oldCancelled: false, keptOld: null };
 
   const fresh = await supabase
     .from('client_invites')
@@ -249,22 +254,20 @@ export async function changeInviteEmail(input: { inviteId: string; email: string
       : items.some((i) => i.workout_id)
         ? { kind: 'workouts', items: items.flatMap((i) => (i.workout_id ? [{ workoutId: i.workout_id, on: day(i.start_on) }] : [])) }
         : { kind: 'none' };
-  const planFailed: ErrorCode | null = plan.kind === 'none' ? null : plan.kind === 'program' ? 'invite_plan_program_failed' : 'invite_plan_workouts_failed';
-  let planError: ErrorCode | null = null;
-  if (newId) {
-    const kept = await supabase.rpc('set_invite_plan', { p_invite_id: newId, ...invitePlanArgs(plan) });
-    if (kept.error) planError = planFailed;
-  } else {
-    // The new invite couldn't be found to keep the plan with it: say so (as inviteClient does).
-    planError = planFailed;
+  // The new invite couldn't be looked up, or the plan couldn't be kept with it: the old invite stays as it is (its
+  // plan safe, its link still working) and the window stays on it, saying so.
+  if (!newId) {
+    revalidatePath('/clients');
+    return { ok: true, result, inviteId: null, planError: null, oldCancelled: false, keptOld: 'lookup' };
   }
-  // The old link stops working (checked: only a deleted row means it did). Not when the new invite couldn't be found:
-  // then the old one keeps its plan, and the window stays on it.
-  let oldCancelled = false;
-  if (newId) {
-    const gone = await supabase.from('client_invites').delete().eq('id', old.id).eq('workspace_id', workspaceId).is('accepted_at', null).select('id');
-    oldCancelled = !gone.error && gone.data.length > 0;
+  const kept = await supabase.rpc('set_invite_plan', { p_invite_id: newId, ...invitePlanArgs(plan) });
+  if (kept.error && plan.kind !== 'none') {
+    revalidatePath('/clients');
+    return { ok: true, result, inviteId: null, planError: null, oldCancelled: false, keptOld: 'plan' };
   }
+  // The old link stops working (checked: only a deleted row means it did).
+  const gone = await supabase.from('client_invites').delete().eq('id', old.id).eq('workspace_id', workspaceId).is('accepted_at', null).select('id');
+  const oldCancelled = !gone.error && gone.data.length > 0;
   revalidatePath('/clients');
-  return { ok: true, result, inviteId: newId, planError, oldCancelled };
+  return { ok: true, result, inviteId: newId, planError: null, oldCancelled, keptOld: null };
 }
