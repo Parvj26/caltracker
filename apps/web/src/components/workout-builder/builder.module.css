@@ -1044,3 +1044,10 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 .splitAddSetPhone .addSetHint { white-space: nowrap; }
 .splitAddSetPhone .splitMenu { top: auto; bottom: 100%; margin: 0 0 var(--ct-space-1); }
 .splitMain:disabled { cursor: not-allowed; color: var(--ct-ink-muted); background: none; }
+/* A phone with four boxes: every pixel to the boxes (tighter gaps and edges, regular weight digits), so "102.5" and
+   "10:00" fit at 375 pt in any font. */
+.sets[data-compact][data-crowded] { --set-num: 16px; }
+.sets[data-compact][data-crowded] .setColumns, .sets[data-compact][data-crowded] .setRow { column-gap: 2px; }
+.sets[data-compact][data-crowded] .setRow { padding-inline: 2px; }
+.sets[data-compact][data-crowded] .setColumns { padding-inline: calc(2px + var(--ct-border-width-card)); }
+.sets[data-compact][data-crowded] .setCell .narrow { padding-inline: 0; font-weight: var(--ct-weight-body); letter-spacing: -0.01em; }
