@@ -179,6 +179,19 @@ export function allWorkoutsDone(workoutIds: readonly string[], statuses: Readonl
   return workoutIds.length > 0 && workoutIds.every((id) => statuses[id]?.kind === 'done');
 }
 
+/**
+ * When the done card reads and shows "Up next": every one of today's workouts done, online (it can't be read offline),
+ * and no workout going on this phone (an empty or unplanned one started after the planned one is mid-task).
+ */
+export function upNextDue(s: {
+  workoutIds: readonly string[];
+  statuses: Readonly<Record<string, { kind: string } | undefined>>;
+  offline: boolean;
+  workoutInProgress: boolean;
+}): boolean {
+  return !s.offline && !s.workoutInProgress && allWorkoutsDone(s.workoutIds, s.statuses);
+}
+
 export type UpNext = {
   id: string;
   name: string;

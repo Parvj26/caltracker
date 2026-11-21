@@ -26,7 +26,7 @@ import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
 import { cacheFirstTime, fetchFirstName, readCachedFirstName } from '@/lib/today-api';
 import { useWelcomeState, welcomeGate } from '@/lib/welcome-gate';
-import { allWorkoutsDone, greeting, headerDate, upNextLine, welcome } from '@/lib/today-logic';
+import { greeting, headerDate, upNextDue, upNextLine, welcome } from '@/lib/today-logic';
 import { nextUpLabel } from '@/lib/log-flow-model';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useCachedLoad } from '@/lib/use-cached-load';
@@ -255,8 +255,10 @@ export default function Today() {
   );
 
   // "Up next" in the done card: once every one of today's workouts is done, read the next planned one. Best effort
-  // and never waited for (a failed read just leaves the line out); not offline, where it can't be read.
-  const allDone = data?.kind === 'today' && !data.offline && allWorkoutsDone(data.workouts.map((w) => w.id), statuses);
+  // and never waited for (a failed read just leaves the line out); not offline, nor while a workout is going.
+  const allDone =
+    data?.kind === 'today' &&
+    upNextDue({ workoutIds: data.workouts.map((w) => w.id), statuses, offline: data.offline, workoutInProgress: inProgress !== null });
   const [upNextRead, setUpNextRead] = useState<{ day: IsoDate; next: WorkoutSummary | null } | null>(null);
   useEffect(() => {
     if (!allDone) return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allWorkoutsDone, upNextLine } from './today-logic';
+import { allWorkoutsDone, upNextDue, upNextLine } from './today-logic';
 
 const done = { kind: 'done' };
 const going = { kind: 'in_progress' };
@@ -46,5 +46,19 @@ describe('Up next: what it says', () => {
 
   it('uses the date 7 days ahead (the same weekday as today)', () => {
     expect(upNextLine(next('2026-11-27'), '2026-11-20')?.label).toBe('Up next · Fri 27 Nov');
+  });
+});
+
+describe('Up next: never mid-workout', () => {
+  const base = { workoutIds: ['a'], statuses: { a: done }, offline: false, workoutInProgress: false };
+  it('shows once all done, online, with nothing going', () => {
+    expect(upNextDue(base)).toBe(true);
+  });
+  it('hides while an empty or unplanned workout started after the planned one is going', () => {
+    expect(upNextDue({ ...base, workoutInProgress: true })).toBe(false);
+  });
+  it('hides offline and while not all done', () => {
+    expect(upNextDue({ ...base, offline: true })).toBe(false);
+    expect(upNextDue({ ...base, statuses: {} })).toBe(false);
   });
 });

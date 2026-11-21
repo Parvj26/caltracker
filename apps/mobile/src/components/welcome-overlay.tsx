@@ -27,6 +27,8 @@ export function WelcomeOverlay() {
   const userId = session?.user.id ?? null;
   const [mounted, setMounted] = useState(showing);
   const [words, setWords] = useState<WelcomeText | null>(null);
+  // VoiceOver hears the welcome only once the saved name has been read, so it never announces a placeholder first.
+  const [nameRead, setNameRead] = useState(false);
   const opacity = useRef(new Animated.Value(1)).current;
   const nameIn = useRef(new Animated.Value(0)).current;
 
@@ -60,8 +62,12 @@ export function WelcomeOverlay() {
     if (!showing || !userId) return;
     let alive = true;
     void Promise.all([readCachedFirstName(userId), readCachedFirstTime(userId)]).then(
-      ([name, firstTime]) => alive && setWords(welcomeText(name, firstTime)),
-      () => undefined,
+      ([name, firstTime]) => {
+        if (!alive) return;
+        setWords(welcomeText(name, firstTime));
+        setNameRead(true);
+      },
+      () => alive && setNameRead(true),
     );
     return () => {
       alive = false;
@@ -87,6 +93,7 @@ export function WelcomeOverlay() {
       if (!finished) return;
       setMounted(false);
       setWords(null);
+      setNameRead(false);
       nameIn.setValue(0);
     });
     return () => fade.stop();
@@ -99,9 +106,11 @@ export function WelcomeOverlay() {
     <Animated.View
       testID="welcome-overlay"
       pointerEvents={showing ? 'auto' : 'none'}
-      accessible
-      accessibilityViewIsModal
-      accessibilityLabel={words?.accessibilityLabel ?? 'CalTracker'}
+      // Only while showing: during the fade VoiceOver is free to move on to Today.
+      accessible={showing && nameRead}
+      accessibilityViewIsModal={showing}
+      accessibilityElementsHidden={!showing}
+      accessibilityLabel={showing && nameRead ? (words?.accessibilityLabel ?? 'CalTracker') : undefined}
       style={[StyleSheet.absoluteFill, styles.cover, { opacity }]}
     >
       <Animated.View style={[styles.logo, rise]}>
