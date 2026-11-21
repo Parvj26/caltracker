@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { LOG_TREE_SELECT, logRowToDoc, orderTrainingTabs } from '@caltracker/shared';
-import type { Database, IsoDate, LogTreeRow, ProgressionHistory, WorkoutDoc, WorkoutLogDoc } from '@caltracker/shared';
+import type { ClientFlag, Database, IsoDate, LogTreeRow, ProgressionHistory, WorkoutDoc, WorkoutLogDoc } from '@caltracker/shared';
 import { avatarTone, initials } from '@/app/(coach)/clients/avatar';
+import { loadClientFlags } from '@/lib/client-flag-rows';
 import { loadLastTimes, type LastTimes } from '@/lib/coach-session';
 import { exerciseImageUrl } from '@/lib/exercise-index';
 import { loadProgression } from '@/lib/progression';
@@ -20,8 +21,8 @@ type PaneBase = {
   tone: 'blue' | 'lime' | 'pink';
   startedAt: string;
   log: WorkoutLogDoc;
-  /** The coach's "Limitations & injuries" note for the client, or '' (each person's screen shows its injury chip). */
-  injury: string;
+  /** The client's open flags, newest first (each person's screen shows its injury chip). */
+  flags: ClientFlag[];
 };
 
 /** Someone else logs it (the client on their phone, or another coach): the coach watches it live. */
@@ -72,16 +73,14 @@ export async function loadTrainingNow(
 
   const clientIds = [...new Set(rows.map((r) => r.client_id))];
   const otherLoggers = [...new Set(rows.flatMap((r) => (r.logged_by && r.logged_by !== r.client_id && r.logged_by !== coachId ? [r.logged_by] : [])))];
-  const [members, profiles, limitations] = await Promise.all([
+  const [members, profiles, flagsOf] = await Promise.all([
     // Current clients only (a removed client is no longer a member).
     supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId).eq('role', 'client').in('user_id', clientIds),
     supabase.from('profiles').select('id, first_name, full_name').in('id', [...clientIds, ...otherLoggers]),
-    supabase.from('client_limitations').select('client_id, body').eq('workspace_id', workspaceId).in('client_id', clientIds),
+    loadClientFlags(supabase, workspaceId, clientIds, { openOnly: true }),
   ]);
   if (members.error) throw new Error(`Could not load clients: ${members.error.message}`);
   if (profiles.error) throw new Error(`Could not load names: ${profiles.error.message}`);
-  if (limitations.error) throw new Error(`Could not load limitations: ${limitations.error.message}`);
-  const injuryOf = new Map(limitations.data.map((l) => [l.client_id, l.body.trim()]));
   const current = new Set(members.data.map((m) => m.user_id));
   const profileOf = new Map(profiles.data.map((p) => [p.id, p]));
   const live = rows.filter((r) => current.has(r.client_id));
@@ -112,7 +111,7 @@ export async function loadTrainingNow(
         tone: avatarTone(r.client_id),
         startedAt: log.startedAt,
         log,
-        injury: injuryOf.get(r.client_id) ?? '',
+        flags: flagsOf.get(r.client_id) ?? [],
       };
       if (r.logged_by === coachId && r.workout_id !== null) {
         const workout = await loadWorkoutDoc(supabase, r.workout_id);

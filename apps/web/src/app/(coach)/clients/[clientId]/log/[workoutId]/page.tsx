@@ -8,7 +8,8 @@ import { requireCoach } from '@/lib/auth';
 import { renderTime } from '@/lib/live-refresh';
 import { laterDayNotice, loadLastTimes, loadSessionState } from '@/lib/coach-session';
 import { loadProgression } from '@/lib/progression';
-import { getClient, getClientLimitations, getLog, getWorkoutDoc } from '@/lib/page-data';
+import { getClient, getLog, getWorkoutDoc } from '@/lib/page-data';
+import { getOpenClientFlags } from '@/lib/client-flags';
 import { InjuryChip } from '../../injury-chip';
 import { pageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
@@ -55,8 +56,8 @@ export default async function SessionPage({
   const back = (
     <ParentBackLink href={`/clients/${client.id}/training`} label={client.name} />
   );
-  // The coach's injury note, near the top while they log (Overview shows the same chip).
-  const injury = <InjuryChip text={await getClientLimitations(client.id)} />;
+  // The client's open flags, near the top while they log (Overview shows the same chip).
+  const injury = <InjuryChip flags={await getOpenClientFlags(client.id)} />;
 
   if (state.kind === 'other_workout') {
     return (

@@ -788,3 +788,6 @@ export { compactExerciseName, exerciseNameKey, findNearDuplicate, sameExerciseNa
 
 // Movement assessments (Limitations & injuries tab).
 export * from './assessment/index';
+
+// Body map: the muscle-group catalogue, the figure's drawing, and client flags (pains, injuries, limitations).
+export * from './anatomy/index';

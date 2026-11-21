@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { OVERVIEW_METRICS, STICKERS, WORKOUT_TREE_SELECT, addDays, metricDailyEntries, readAllPages, toMetricEntries, workoutPreview, workoutRowToDoc } from '@caltracker/shared';
-import type { Database, HomeWorkout, IsoDate, OverviewScan, Units, WorkoutPreview, WorkoutTreeRow } from '@caltracker/shared';
+import type { ClientFlag, Database, HomeWorkout, IsoDate, OverviewScan, Units, WorkoutPreview, WorkoutTreeRow } from '@caltracker/shared';
+import { FLAG_COLUMNS, rowToFlag } from './client-flag-rows';
 import { loadLiveLogs, type LiveLog } from './home-live';
 
 /**
@@ -29,7 +30,8 @@ export type ClientOverview = {
   events: OverviewEvent[];
   profile: { email: string | null; timeZone: string | null; joinedAt: string | null };
   goal: { goal: string; targetDate: IsoDate | null } | null;
-  limitations: string;
+  /** The coach's flags (pains, injuries, limitations), open and resolved, newest since first. */
+  flags: ClientFlag[];
   notes: OverviewNote[];
   /** The Today card: the first exercises and program of each workout planned around today (UTC, a day either side). */
   todayPreviews: Record<string, { preview: WorkoutPreview; programName: string | null }>;
@@ -52,7 +54,7 @@ export async function loadClientOverview(
 ): Promise<ClientOverview> {
   const clientId = client.id;
   const since = `${addDays(utcToday, -32)}T00:00:00Z`;
-  const [workouts, unplanned, stats, stickerCount, recentStickers, scans, recentScans, recentLogs, profile, member, invite, past, goal, limitations, notes, todays, live] =
+  const [workouts, unplanned, stats, stickerCount, recentStickers, scans, recentScans, recentLogs, profile, member, invite, past, goal, flags, notes, todays, live] =
     await Promise.all([
       supabase
         .from('workouts')
@@ -128,7 +130,13 @@ export async function loadClientOverview(
         .maybeSingle(),
       supabase.from('past_clients').select('email, joined_at').eq('workspace_id', workspaceId).eq('user_id', clientId).maybeSingle(),
       supabase.from('client_goals').select('goal, target_date').eq('workspace_id', workspaceId).eq('client_id', clientId).maybeSingle(),
-      supabase.from('client_limitations').select('body').eq('workspace_id', workspaceId).eq('client_id', clientId).maybeSingle(),
+      supabase
+        .from('client_flags')
+        .select(FLAG_COLUMNS)
+        .eq('workspace_id', workspaceId)
+        .eq('client_id', clientId)
+        .order('since', { ascending: false })
+        .order('created_at', { ascending: false }),
       supabase
         .from('client_notes')
         .select('id, body, created_at, updated_at')
@@ -159,7 +167,7 @@ export async function loadClientOverview(
     ['email', invite],
     ['past client', past],
     ['goal', goal],
-    ['limitations', limitations],
+    ['flags', flags],
     ['notes', notes],
     ["today's workouts", todays],
   ] as const) {
@@ -235,7 +243,7 @@ export async function loadClientOverview(
       joinedAt: member.data?.created_at ?? past.data?.joined_at ?? null,
     },
     goal: goal.data ? { goal: goal.data.goal, targetDate: goal.data.target_date } : null,
-    limitations: limitations.data?.body ?? '',
+    flags: (flags.data ?? []).map(rowToFlag),
     notes: (notes.data ?? []).map((n) => ({ id: n.id, body: n.body, createdAt: n.created_at, updatedAt: n.updated_at })),
     todayPreviews: Object.fromEntries(
       ((todays.data ?? []) as unknown as TodayTreeRow[]).map((w) => [

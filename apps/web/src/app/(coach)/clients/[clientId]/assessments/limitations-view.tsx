@@ -7,6 +7,7 @@ import {
   cycleView,
   formatPlainDayMonthInYear,
   type AssessmentSlot,
+  type ClientFlag,
   type CycleSummary,
   type Finding,
   type SlotState,
@@ -15,7 +16,7 @@ import { Button, ButtonLink, Card } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/chevron-icon';
 import { useLocalToday } from '@/lib/local-today';
 import { useMediaQuery } from '@/lib/use-media-query';
-import { LimitationsCard } from '../overview/editors';
+import { FlagsCard } from '@/components/flags/flags-card';
 import { assessmentHref, compareHref } from './links';
 import type { AssessmentTemplate, LibraryTest } from './load';
 import { CheckIcon, FindingsList } from './parts';
@@ -27,7 +28,7 @@ type Client = { id: string; name: string; firstName: string };
 
 /**
  * The "Limitations & injuries" tab (AS1). One column on a phone and iPad; on a desktop the assessments sit left and the
- * injuries note right.
+ * flags card (body map, the open flags, Resolved) right.
  */
 export function LimitationsView({
   client,
@@ -37,7 +38,7 @@ export function LimitationsView({
   initialKeys,
   latest,
   findings,
-  limitations,
+  flags,
   readOnly,
 }: {
   client: Client;
@@ -47,7 +48,8 @@ export function LimitationsView({
   initialKeys: string[];
   latest: { id: string; slot: AssessmentSlot; assessedOn: string } | null;
   findings: Finding[];
-  limitations: string;
+  /** The client's flags, open and resolved (the same card as on the Overview). */
+  flags: ClientFlag[];
   readOnly: boolean;
 }) {
   const today = useLocalToday();
@@ -79,7 +81,7 @@ export function LimitationsView({
             </Card>
           ) : null}
         </div>
-        <LimitationsCard clientId={client.id} body={limitations} readOnly={readOnly} />
+        <FlagsCard clientId={client.id} clientName={client.name} flags={flags} readOnly={readOnly} today={today} />
       </div>
       {starting ? (
         <StartDialog

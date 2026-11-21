@@ -1,0 +1,46 @@
+export {
+  BODY_AREAS,
+  BODY_AREA_IDS,
+  BODY_REGIONS,
+  MUSCLE_GROUPS,
+  MUSCLE_IDS,
+  bodyRegion,
+  isBodyRegionId,
+  isMuscleId,
+  muscleGroup,
+  regionBothName,
+  regionSideLabel,
+  regionSideName,
+  regionSides,
+} from './muscles';
+export type { BodyAreaId, BodyRegion, BodyRegionId, BodySide, BodyView, MuscleId } from './muscles';
+export {
+  FIGURE_AREAS,
+  FIGURE_HEAD,
+  FIGURE_HEIGHT,
+  FIGURE_MUSCLES,
+  FIGURE_SILHOUETTE,
+  FIGURE_WIDTH,
+  isMirrored,
+  pathCentre,
+  pinPoints,
+  regionOnView,
+  viewerLeftSide,
+} from './figure';
+export {
+  FLAG_NOTE_MAX_LENGTH,
+  FLAG_SIDES,
+  FLAG_SIDE_LABELS,
+  FLAG_TYPES,
+  FLAG_TYPE_LABELS,
+  defaultFlagSide,
+  flagChipSummary,
+  flagHeadline,
+  flagPlace,
+  flagReminderText,
+  flagSidesFor,
+  openFlagsNewestFirst,
+  resolvedFlags,
+  validateFlag,
+} from './flags';
+export type { ClientFlag, FlagCheck, FlagInput, FlagSide, FlagType } from './flags';

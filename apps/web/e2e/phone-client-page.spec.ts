@@ -26,7 +26,7 @@ test.afterAll(async () => {
   if (created.length === 0) return;
   await admin.from('workout_logs').delete().in('client_id', created);
   await admin.from('workouts').delete().in('client_id', created);
-  await admin.from('client_limitations').delete().in('client_id', created);
+  await admin.from('client_flags').delete().in('client_id', created);
   if (library.length) await admin.from('workouts').delete().in('name', library);
   for (const id of created) await admin.auth.admin.deleteUser(id);
 });
@@ -114,7 +114,11 @@ test('Training: the two buttons share a row, programs fold into one line, and th
 test('Overview Today card: a workout today offers Log session, and the injury chip shows here and on the logger', async ({ page }) => {
   test.slow();
   const client = await newClient('Ines');
-  const lim = await admin.from('client_limitations').insert({ workspace_id: workspaceId, client_id: client.id, body: 'Left knee: no deep squats.\nLower back: go light' });
+  // Two open flags: the newer one leads the chip, the other is "+1 more".
+  const lim = await admin.from('client_flags').insert([
+    { workspace_id: workspaceId, client_id: client.id, region: 'lower_back', side: 'centre', type: 'limitation', note: 'Go light', since: '2026-01-01' },
+    { workspace_id: workspaceId, client_id: client.id, region: 'knee', side: 'L', type: 'limitation', note: 'No deep squats.', since: '2026-02-01' },
+  ]);
   if (lim.error) throw lim.error;
   await signInAsCoach(page);
   const name = `Lower Body ${Date.now()}`;
