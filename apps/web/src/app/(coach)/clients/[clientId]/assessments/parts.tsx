@@ -82,7 +82,7 @@ export function ScoreCard({ score, tests, names }: { score: number | null; tests
       ) : (
         <p className={styles.scoreLine}>
           <span className={styles.scoreNumber} data-testid="movement-score">{score}</span>
-          <span className={styles.band} data-ph-safe="">{scoreBand(score).label}</span>
+          <span className={styles.band} data-band={scoreBand(score).id} data-ph-safe="">{scoreBand(score).label}</span>
         </p>
       )}
       {scored.length > 0 ? (

@@ -1,0 +1,123 @@
+/* Library › Corrective › Templates (AS11). The list, and the open template beside it from 600 px (iPad, desktop); a
+   phone edits in a full-screen pop-up. Tokens only. */
+
+.page { display: flex; flex-direction: column; gap: var(--ct-space-4-5); max-width: 1100px; }
+.intro { display: block; max-width: 70ch; }
+@media (max-width: 599.98px) { .intro { display: none; } }
+.caption { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.kicker { margin: 0; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ct-ink-muted); }
+
+/* Corrective's own sections (Exercises | Templates), shown once step 2 adds Exercises. Selected = white pill + ink border. */
+.subTabs { display: flex; gap: var(--ct-space-1); width: max-content; max-width: 100%; margin: 0; padding: var(--ct-space-1); list-style: none; border-radius: 14px; background: var(--ct-surface); }
+.subTab { display: inline-flex; align-items: center; min-height: var(--ct-tap-min); padding: 0 var(--ct-space-4); border: var(--ct-border-width-secondary-button) solid transparent; border-radius: 10px; color: var(--ct-ink-muted); font-weight: var(--ct-weight-button); text-decoration: none; }
+.subTabOn { border-color: var(--ct-ink); background: var(--ct-bg); color: var(--ct-ink); }
+
+/* ---------- List + editor ---------- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ct-space-6); align-items: start; }
+@media (min-width: 600px) {
+  .layout[data-has-editor] { grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.6fr); }
+}
+.listPane { display: flex; flex-direction: column; gap: var(--ct-space-3); min-width: 0; }
+.list { min-width: 0; }
+.empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ct-space-2); padding: var(--ct-space-4) 0; }
+.emptyTitle { margin: 0; font-weight: var(--ct-weight-section-heading); }
+
+.editorPane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-4);
+  min-width: 0;
+  padding-left: var(--ct-space-6);
+  border-left: var(--ct-border-width-card) solid var(--ct-border);
+}
+.paneTitle { margin: 0; font-size: var(--ct-size-section-heading); font-weight: var(--ct-weight-section-heading); }
+.editorBody { display: flex; flex-direction: column; gap: var(--ct-space-4); min-width: 0; }
+.paneActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ct-space-3); }
+.paneSave { display: inline-flex; align-items: center; gap: var(--ct-space-3); margin-left: auto; }
+.savedNote { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button); color: var(--ct-ink-muted); }
+.dangerText { color: var(--ct-danger); }
+.dialogDelete { display: flex; padding-top: var(--ct-space-2); border-top: var(--ct-border-width-card) solid var(--ct-border); }
+
+/* ---------- The tests, in order ---------- */
+.testsBlock { display: flex; flex-direction: column; gap: var(--ct-space-3); }
+.tests { display: flex; flex-direction: column; gap: var(--ct-space-2); margin: 0; padding: 0; list-style: none; }
+.test {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  min-height: 64px;
+  padding: var(--ct-space-2) var(--ct-space-2) var(--ct-space-2) var(--ct-space-3);
+  border: var(--ct-border-width-card) solid var(--ct-border);
+  border-radius: var(--ct-radius-input);
+  container-type: inline-size;
+}
+.test[data-retired] { border-style: dashed; border-color: var(--ct-border-strong); }
+.testNumber {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--ct-radius-pill);
+  background: var(--ct-surface);
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-button);
+}
+.testText { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.testName { font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
+.testSummary { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
+.testActions { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; gap: 0; max-width: calc(var(--ct-tap-min) * 4); }
+@media (max-width: 599.98px) {
+  /* Two rows of two on a phone so the name keeps its room. */
+  .testActions { max-width: calc(var(--ct-tap-min) * 2); }
+}
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ct-tap-min);
+  height: var(--ct-tap-min);
+  border: 0;
+  border-radius: var(--ct-radius-pill);
+  background: transparent;
+  color: var(--ct-ink);
+  cursor: pointer;
+}
+.iconButton[aria-disabled='true'] { opacity: 0.35; cursor: not-allowed; }
+.iconButton[aria-pressed='true'] { background: var(--ct-ink); color: var(--ct-bg); }
+@media (hover: hover) { .iconButton:not([aria-disabled='true']):not([aria-pressed='true']):hover { background: var(--ct-surface); } }
+
+/* ---------- Add / swap a test (inline, never a second pop-up) ---------- */
+.picker { display: flex; flex-direction: column; gap: var(--ct-space-3); padding: var(--ct-space-3); border: var(--ct-border-width-secondary-button) solid var(--ct-ink); border-radius: var(--ct-radius-input); }
+.pickerHead { display: flex; align-items: center; justify-content: space-between; gap: var(--ct-space-2); min-height: var(--ct-tap-min); }
+.pickerTitle { margin: 0; font-weight: var(--ct-weight-section-heading); }
+.pickerList { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.pickerItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ct-space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--ct-space-1) var(--ct-space-1);
+  border: 0;
+  border-bottom: var(--ct-border-width-card) solid var(--ct-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pickerList li:last-child .pickerItem { border-bottom: 0; }
+@media (hover: hover) { .pickerItem:hover { background: var(--ct-surface); } }
+.pickerThumb { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--ct-radius-input); background: var(--ct-surface); color: var(--ct-ink-muted); }
+.pickerPlus { flex-shrink: 0; width: var(--ct-tap-min); text-align: center; font-size: 20px; font-weight: var(--ct-weight-button); }
+
+/* ---------- Delete, asked inline ---------- */
+.confirm { display: flex; flex-direction: column; gap: var(--ct-space-3); padding: var(--ct-space-3); border-radius: var(--ct-radius-input); background: var(--ct-danger-bg); }
+.confirmText { margin: 0; }
+.confirmActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ct-space-2); }
+@media (max-width: 599.98px) {
+  .confirmActions { flex-direction: column-reverse; }
+  .confirmActions > * { width: 100%; }
+}

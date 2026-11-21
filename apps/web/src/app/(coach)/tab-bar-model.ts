@@ -1,4 +1,4 @@
-/** The phone tab bar's tabs. Library opens the Workouts / Exercises / Programs sheet; More opens every other page. */
+/** The phone tab bar's tabs. Library opens the Workouts / Exercises / Programs / Corrective sheet; More opens every other page. */
 export type TabId = 'home' | 'clients' | 'library' | 'messages' | 'more';
 
 const TAB_PATHS: Record<'home' | 'clients' | 'messages', string> = {
@@ -8,7 +8,7 @@ const TAB_PATHS: Record<'home' | 'clients' | 'messages', string> = {
 };
 
 /** The pages behind Library (the sidebar item and the phone tab), detail pages included. */
-const LIBRARY_PATHS = ['/workouts', '/exercises', '/programs'];
+const LIBRARY_PATHS = ['/workouts', '/exercises', '/programs', '/corrective'];
 
 /** The pages reached through More (its sheet), so More is the current tab on them. */
 const MORE_PATHS = ['/meals', '/activity', '/community', '/profile', '/help'];

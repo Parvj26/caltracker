@@ -24,8 +24,9 @@ import {
 } from '@/lib/log-api';
 import { useSession } from '@/lib/session';
 import { signOutAndForget } from '@/lib/sign-out';
-import { fetchFirstName, readCachedFirstName } from '@/lib/today-api';
-import { greeting, headerDate, welcome } from '@/lib/today-logic';
+import { cacheFirstTime, fetchFirstName, readCachedFirstName } from '@/lib/today-api';
+import { useWelcomeState, welcomeGate } from '@/lib/welcome-gate';
+import { greeting, headerDate, upNextDue, upNextLine, welcome } from '@/lib/today-logic';
 import { nextUpLabel } from '@/lib/log-flow-model';
 import { useActiveLog } from '@/lib/use-active-log';
 import { useCachedLoad } from '@/lib/use-cached-load';
@@ -169,10 +170,16 @@ export default function Today() {
   // Set when the logging screen is opened, cleared when Today is back in view: one tap, one screen.
   const navigating = useRef(false);
 
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+
   const load = useCallback(async () => {
     const ticket = ++latest.current;
     try {
       const next = await loadToday();
+      // For the welcome on the next fresh open: "Welcome, Maya" for a new client, else "Welcome back".
+      const uid = userIdRef.current;
+      if (uid && (next.kind === 'first-time' || !next.offline)) cacheFirstTime(uid, next.kind === 'first-time');
       if (next.kind === 'today') {
         setPlans((p) => ({ ...p, ...next.plans }));
         void next.plansLater?.then((later) => setPlans((p) => ({ ...p, ...later })));
@@ -186,7 +193,20 @@ export default function Today() {
       if (ticket !== latest.current) return;
       setError({ code: 'today_load_failed', text: LOAD_FAILED });
     }
+    // Today (or its error) is on screen: the welcome fades into it.
+    welcomeGate.todayReady();
   }, []);
+
+
+  // A fresh open after more than 10 minutes away: read Today again (the day may have changed), under the welcome.
+  const { opens } = useWelcomeState();
+  const seenOpens = useRef(opens);
+  useEffect(() => {
+    if (opens === seenOpens.current) return;
+    seenOpens.current = opens;
+    setToday(localToday());
+    void load();
+  }, [opens, load]);
 
   useFocusEffect(
     useCallback(() => {
@@ -215,6 +235,14 @@ export default function Today() {
 
 
   const inProgress = active?.status === 'in_progress' ? active : null;
+  // The welcome after a long time away shows only onto Today in view with no workout going (never mid-task).
+  const going = inProgress !== null;
+  useFocusEffect(
+    useCallback(() => {
+      welcomeGate.reportToday(true, going);
+      return () => welcomeGate.reportToday(false, going);
+    }, [going]),
+  );
   // "6 of 19 sets · next: A1 Romanian Deadlift" on the card of the workout going (the shared set-count rule).
   const progress = useMemo<WorkoutProgress | null>(() => {
     if (!inProgress) return null;
@@ -225,6 +253,26 @@ export default function Today() {
     () => workoutStatuses(data?.kind === 'today' ? data.logs : [], active, finished, pending),
     [data, active, finished, pending],
   );
+
+  // "Up next" in the done card: once every one of today's workouts is done, read the next planned one. Best effort
+  // and never waited for (a failed read just leaves the line out); not offline, nor while a workout is going.
+  const allDone =
+    data?.kind === 'today' &&
+    upNextDue({ workoutIds: data.workouts.map((w) => w.id), statuses, offline: data.offline, workoutInProgress: inProgress !== null });
+  const [upNextRead, setUpNextRead] = useState<{ day: IsoDate; next: WorkoutSummary | null } | null>(null);
+  useEffect(() => {
+    if (!allDone) return;
+    let alive = true;
+    // Read again with each load of Today (focus, pull to refresh), so a plan the coach changed shows.
+    void fetchNextWorkout(today).then(
+      (next) => alive && setUpNextRead({ day: today, next }),
+      () => alive && setUpNextRead(null),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [allDone, today, data]);
+  const upNext = allDone && upNextRead?.day === today ? upNextLine(upNextRead.next, today) : null;
 
   const openLog = useCallback(
     (id: string) => {
@@ -353,7 +401,7 @@ export default function Today() {
 
         {/* More than one workout today: one card each, stacked. */}
         {data?.kind === 'today'
-          ? data.workouts.map((w) => (
+          ? data.workouts.map((w, i) => (
               <WorkoutCard
                 key={w.id}
                 workout={w}
@@ -363,6 +411,7 @@ export default function Today() {
                 starting={starting === w.id}
                 onStart={() => void startWorkout(w)}
                 onView={openSummary}
+                upNext={i === data.workouts.length - 1 ? upNext : null}
               />
             ))
           : null}

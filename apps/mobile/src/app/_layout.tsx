@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { UpdateGate } from '@/components/update-gate';
+import { WelcomeOverlay } from '@/components/welcome-overlay';
 import { AnalyticsProvider } from '@/lib/analytics/provider';
 import { SessionProvider, useSession } from '@/lib/session';
 import { FONT_ASSETS } from '@/theme/fonts';
@@ -55,6 +56,8 @@ export default function RootLayout() {
     return () => clearTimeout(t);
   }, []);
 
+  // The welcome (WelcomeOverlay) is drawn in the same frame, with the splash's logo in the same spot, so the hand-over
+  // is seamless; it then stays only while Today's first load is pending.
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync().catch(() => undefined);
   }, [ready]);
@@ -65,9 +68,12 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <AnalyticsProvider>
         {/* A build below app_config.ios_min_build sees only the update screen, signed in or out. */}
-        <UpdateGate>
-          <RootStack />
-        </UpdateGate>
+        <View style={{ flex: 1 }}>
+          <UpdateGate>
+            <RootStack />
+          </UpdateGate>
+          <WelcomeOverlay />
+        </View>
       </AnalyticsProvider>
     </SessionProvider>
   );

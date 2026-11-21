@@ -317,6 +317,41 @@ export type Database = {
           },
         ]
       }
+      assessment_templates: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          test_keys: string[]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          test_keys: string[]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          test_keys?: string[]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_test_definitions: {
         Row: {
           created_at: string

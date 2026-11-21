@@ -6,7 +6,7 @@ import { getClient } from '@/lib/page-data';
 import { loadClientFlags } from '@/lib/client-flag-rows';
 import { clientPageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { loadAssessment, loadCycles, loadInitialKeys, loadLibrary } from '../../assessments/load';
+import { loadAssessment, loadCycles, loadInitialKeys, loadLibrary, loadTemplates } from '../../assessments/load';
 import { LimitationsView } from '../../assessments/limitations-view';
 
 export async function generateMetadata({ params }: { params: Promise<{ clientId: string }> }): Promise<Metadata> {
@@ -23,9 +23,10 @@ export default async function ClientLimitationsPage({ params }: { params: Promis
   const client = await getClient(clientId);
   if (!client) notFound();
   const supabase = await createServerSupabase();
-  const [cycles, library, flags] = await Promise.all([
+  const [cycles, library, templates, flags] = await Promise.all([
     loadCycles(supabase, workspaceId, client.id),
     loadLibrary(supabase),
+    loadTemplates(supabase, workspaceId),
     loadClientFlags(supabase, workspaceId, [client.id]),
   ]);
   const view = cycleView(cycles);
@@ -39,6 +40,7 @@ export default async function ClientLimitationsPage({ params }: { params: Promis
       client={{ id: client.id, name: client.name, firstName: client.firstName }}
       cycles={cycles}
       library={library}
+      templates={templates}
       initialKeys={initialKeys}
       latest={latest ? { id: latest.id, slot: latest.slot, assessedOn: latest.assessedOn } : null}
       findings={findings}

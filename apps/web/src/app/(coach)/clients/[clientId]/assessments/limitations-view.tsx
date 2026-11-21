@@ -17,14 +17,14 @@ import { ChevronIcon } from '@/components/ui/chevron-icon';
 import { useLocalToday } from '@/lib/local-today';
 import { useMediaQuery } from '@/lib/use-media-query';
 import { FlagsCard } from '@/components/flags/flags-card';
-import type { LibraryTest } from './load';
+import { assessmentHref, compareHref } from './links';
+import type { AssessmentTemplate, LibraryTest } from './load';
 import { CheckIcon, FindingsList } from './parts';
 import { StartDialog } from './start-dialog';
 import styles from './assessments.module.css';
 
 type Client = { id: string; name: string; firstName: string };
 
-export const assessmentHref = (clientId: string, assessmentId: string) => `/clients/${clientId}/assessments/${assessmentId}`;
 
 /**
  * The "Limitations & injuries" tab (AS1). One column on a phone and iPad; on a desktop the assessments sit left and the
@@ -34,6 +34,7 @@ export function LimitationsView({
   client,
   cycles,
   library,
+  templates,
   initialKeys,
   latest,
   findings,
@@ -43,6 +44,7 @@ export function LimitationsView({
   client: Client;
   cycles: CycleSummary[];
   library: LibraryTest[];
+  templates: AssessmentTemplate[];
   initialKeys: string[];
   latest: { id: string; slot: AssessmentSlot; assessedOn: string } | null;
   findings: Finding[];
@@ -70,6 +72,12 @@ export function LimitationsView({
               </Link>
               <p className={styles.kicker}>Observed</p>
               <FindingsList findings={findings} {...(phone ? { limit: 3 } : {})} moreHref={assessmentHref(client.id, latest.id)} />
+              {/* Step 2 adds "Suggested workout" (and the body map) here. */}
+              <div className={styles.cardActions}>
+                <ButtonLink href={assessmentHref(client.id, latest.id)} variant="secondary" size="compact" phSafe>
+                  Report
+                </ButtonLink>
+              </div>
             </Card>
           ) : null}
         </div>
@@ -81,6 +89,7 @@ export function LimitationsView({
           slot={starting.slot}
           newCycle={starting.newCycle}
           library={library}
+          templates={templates}
           defaultKeys={starting.slot === 'initial' ? [] : initialKeys}
           onClose={() => setStarting(null)}
         />
@@ -104,6 +113,8 @@ function CycleCard({
   const view = cycleView(cycles);
   const day = (iso: string) => formatPlainDayMonthInYear(iso, today);
   const first = view.current?.assessments.find((a) => a.slot === 'initial');
+  // Compare once two assessments of the cycle are done (Initial and Retest 1).
+  const canCompare = (view.current?.assessments.filter((a) => a.status === 'done').length ?? 0) >= 2;
   return (
     <Card className={styles.card} aria-labelledby="assessments-heading" data-testid="assessments-card">
       <div className={styles.cardHead}>
@@ -120,9 +131,16 @@ function CycleCard({
           </li>
         ))}
       </ol>
-      {view.canStartNewCycle && !readOnly ? (
+      {(canCompare || (view.canStartNewCycle && !readOnly)) && view.current ? (
         <div className={styles.cycleActions}>
-          <Button variant="create" onClick={() => onStart('initial', true)}>+ New cycle</Button>
+          {canCompare ? (
+            <ButtonLink href={compareHref(client.id, view.current.id)} variant="secondary" phSafe>
+              Compare
+            </ButtonLink>
+          ) : null}
+          {view.canStartNewCycle && !readOnly ? (
+            <Button variant="create" onClick={() => onStart('initial', true)}>+ New cycle</Button>
+          ) : null}
         </div>
       ) : null}
       {view.past.length > 0 ? (
@@ -158,6 +176,14 @@ function CycleCard({
                       </Link>
                     </li>
                   ))}
+                  {done.length >= 2 ? (
+                    <li>
+                      <Link href={compareHref(client.id, c.id)} className={styles.pastLink}>
+                        <span>Compare cycle {c.number}</span>
+                        <ChevronIcon direction="right" size={18} />
+                      </Link>
+                    </li>
+                  ) : null}
                 </ul>
               </details>
             );
