@@ -114,6 +114,14 @@ export function formatMeasureValue(value: number, unit: MeasureDef['unit']): str
   return unit === 'deg' ? `${value}°` : `${value} ${unit}`;
 }
 
+/**
+ * The two assessments a phone compares (indexes into the cycle's finished ones, in slot order), earlier first:
+ * "from Retest 1 with Initial" is read as Initial → Retest 1, never backwards.
+ */
+export function orderColumnPicks([a, b]: readonly [number, number]): [number, number] {
+  return a <= b ? [a, b] : [b, a];
+}
+
 /** "+17", "−3", "0". */
 export function formatScoreDelta(delta: number): string {
   return delta > 0 ? `+${delta}` : delta < 0 ? `−${Math.abs(delta)}` : '0';
@@ -227,6 +235,21 @@ export function compareAssessments(columns: readonly CompareAssessment[]): Compa
         for (const side of m.sided ? (['L', 'R'] as const) : (['none'] as const)) {
           const k = `${m.id}|${side}`;
           if (!mlines.has(k)) mlines.set(k, { measureId: m.id, side, label: m.label, unit: m.unit, higherIsBetter: m.higherIsBetter, order: ++morder });
+        }
+      }
+    }
+  }
+  // Like findings: the newest column's wording wins (order stays from the first time seen).
+  const relabelled = new Set<string>();
+  for (const a of [...columns].reverse()) {
+    for (const t of a.tests) {
+      for (const m of t.definition.measures) {
+        for (const side of m.sided ? (['L', 'R'] as const) : (['none'] as const)) {
+          const k = `${m.id}|${side}`;
+          const line = mlines.get(k);
+          if (!line || relabelled.has(k)) continue;
+          relabelled.add(k);
+          line.label = m.label;
         }
       }
     }

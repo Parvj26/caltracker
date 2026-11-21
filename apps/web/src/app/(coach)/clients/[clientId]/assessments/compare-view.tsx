@@ -4,6 +4,7 @@ import { useId, useState, type ReactNode } from 'react';
 import {
   SLOT_LABELS,
   compareAssessments,
+  orderColumnPicks,
   formatMeasureDelta,
   formatMeasureValue,
   formatPlainDayMonthInYear,
@@ -38,6 +39,7 @@ const CHANGE_WORD: Record<FindingChange | MeasureChange, string> = {
   worse: 'Worse',
   not_tested: 'Not tested',
 };
+const NOTHING_SEEN = 'Nothing seen in either: every checkpoint was Normal.';
 const SIDE_TEXT = { L: ' · L', R: ' · R', LR: ' · L R', none: '' } as const;
 
 function toCompare(a: AssessmentDetail): CompareAssessment {
@@ -86,10 +88,28 @@ export function CompareView({
   const [pick, setPick] = useState<[number, number]>([0, done.length - 1]);
   const [starting, setStarting] = useState(false);
   const day = (iso: string) => formatPlainDayMonthInYear(iso, today);
-  const shown = phone ? [done[pick[0]]!, done[pick[1]]!] : done;
+  // Always earlier → later, whichever box picked which: Compare reads changes from the first column to the last.
+  const shown = phone ? orderColumnPicks(pick).map((i) => done[i]!) : done;
+  const valueCols = done.length + (retest2 ? 1 : 0);
   const c = compareAssessments(shown.map(toCompare));
   const names = shown.map((a) => SLOT_LABELS[a.slot]);
   const [o1, o2] = [c.overall.values[0] ?? null, c.overall.values[c.overall.values.length - 1] ?? null];
+
+  const findingCounts = (
+    <span className={styles.countChips} data-testid="finding-counts">
+      <span className={styles.changeChip} data-change="improved">{c.findingCounts.improved} improved</span>
+      <span className={styles.changeChip} data-change="same">{c.findingCounts.same} same</span>
+      <span className={styles.changeChip} data-change="new">{c.findingCounts.new} new</span>
+      <span className={styles.changeChip} data-change="worse">{c.findingCounts.worse} worse</span>
+    </span>
+  );
+  const measureCounts = (
+    <span className={styles.countChips} data-testid="measure-counts">
+      {c.measureCounts.improved > 0 ? <span className={styles.changeChip} data-change="improved">{c.measureCounts.improved} improved</span> : null}
+      {c.measureCounts.same > 0 ? <span className={styles.changeChip} data-change="same">{c.measureCounts.same} same</span> : null}
+      {c.measureCounts.worse > 0 ? <span className={styles.changeChip} data-change="worse">{c.measureCounts.worse} worse</span> : null}
+    </span>
+  );
 
   return (
     <div className={styles.compare} data-testid="assessment-compare">
@@ -103,7 +123,7 @@ export function CompareView({
               label={i === 0 ? 'Compare from' : 'Compare with'}
               value={pick[i]}
               options={done.map((a, j) => ({ value: j, label: `${SLOT_LABELS[a.slot]} · ${day(a.assessedOn)}`, disabled: j === pick[i === 0 ? 1 : 0] }))}
-              onChange={(v) => setPick((p) => (i === 0 ? [v, p[1]] : [p[0], v]))}
+              onChange={(v) => setPick((p) => orderColumnPicks(i === 0 ? [v, p[1]] : [p[0], v]))}
             />
           ))}
         </div>
@@ -128,10 +148,10 @@ export function CompareView({
             </p>
             {o1 !== null && o2 !== null ? (
               <p className={styles.bandLine} data-ph-safe="">
-                <span className={styles.band}>{scoreBand(o1).label}</span>
+                <span className={styles.band} data-band={scoreBand(o1).id}>{scoreBand(o1).label}</span>
                 <span aria-hidden="true">→</span>
                 <span className={styles.srOnly}>to</span>
-                <span className={styles.band}>{scoreBand(o2).label}</span>
+                <span className={styles.band} data-band={scoreBand(o2).id}>{scoreBand(o2).label}</span>
               </p>
             ) : null}
           </div>
@@ -158,84 +178,113 @@ export function CompareView({
         </div>
       </Card>
 
-      {!phone ? (
-        <ol className={styles.compareColumns} aria-label="Assessments compared" style={{ ['--compare-cols' as string]: done.length + (retest2 ? 1 : 0) }}>
-          <li aria-hidden="true" />
-          {done.map((a) => (
-            <li key={a.id} className={styles.compareColumn}>
-              <span className={styles.slotName}>{SLOT_LABELS[a.slot]}</span>
-              <span className={styles.slotMeta}>{day(a.assessedOn)}</span>
-            </li>
-          ))}
-          {retest2 ? (
-            <li className={styles.compareColumn} data-empty="" data-testid="compare-retest2">
-              <span className={styles.slotName}>Retest 2</span>
-              <span className={styles.slotMeta}>Not done · optional</span>
-              {retest2.canStart && !readOnly ? (
-                <Button variant="secondary" size="compact" onClick={() => setStarting(true)} aria-label="Start Retest 2" phSafe>
-                  Start
-                </Button>
-              ) : null}
-            </li>
-          ) : null}
-          <li className={styles.compareChangeHead} aria-hidden="true">Change</li>
-        </ol>
-      ) : null}
-
       {slots.bodyMaps}
 
-      <section className={styles.compareSection} aria-labelledby="compare-findings-heading">
-        <div className={styles.compareSectionHead}>
-          <h2 id="compare-findings-heading" className={styles.kicker}>Findings</h2>
-          <span className={styles.countChips} data-testid="finding-counts">
-            <span className={styles.changeChip} data-change="improved">{c.findingCounts.improved} improved</span>
-            <span className={styles.changeChip} data-change="same">{c.findingCounts.same} same</span>
-            <span className={styles.changeChip} data-change="new">{c.findingCounts.new} new</span>
-            <span className={styles.changeChip} data-change="worse">{c.findingCounts.worse} worse</span>
-          </span>
-        </div>
-        {c.findings.length === 0 ? (
-          <p className={styles.caption}>Nothing seen in either: every checkpoint was Normal.</p>
-        ) : phone ? (
-          <ul className={styles.compareList} aria-label="Findings">
-            {c.findings.map((f) => (
-              <FindingItem key={`${f.checkpointId}-${f.side}`} row={f} />
-            ))}
-          </ul>
-        ) : (
-          <CompareTable caption="Findings" names={names}>
-            {c.findings.map((f) => (
-              <tr key={`${f.checkpointId}-${f.side}`}>
-                <th scope="row" data-ph-safe="">{f.label}{SIDE_TEXT[f.side]}</th>
-                {f.values.map((v, i) => (
-                  <td key={i} data-value={v}>{v === 'not_tested' ? <span className={styles.changeChip} data-change="not_tested">Not tested</span> : VALUE_WORD[v]}</td>
+      {phone ? (
+        <>
+          <section className={styles.compareSection} aria-labelledby="compare-findings-heading">
+            <div className={styles.compareSectionHead}>
+              <h2 id="compare-findings-heading" className={styles.kicker}>Findings</h2>
+              {findingCounts}
+            </div>
+            {c.findings.length === 0 ? (
+              <p className={styles.caption}>{NOTHING_SEEN}</p>
+            ) : (
+              <ul className={styles.compareList} aria-label="Findings">
+                {c.findings.map((f) => (
+                  <FindingItem key={`${f.checkpointId}-${f.side}`} row={f} />
                 ))}
-                {retest2 ? <td aria-hidden="true">–</td> : null}
-                <td><ChangeChip change={f.change} /></td>
-              </tr>
+              </ul>
+            )}
+          </section>
+          {c.measures.length > 0 ? (
+            <section className={styles.compareSection} aria-labelledby="compare-measures-heading">
+              <div className={styles.compareSectionHead}>
+                <h2 id="compare-measures-heading" className={styles.kicker}>Measurements</h2>
+                {measureCounts}
+              </div>
+              <ul className={styles.compareList} aria-label="Measurements">
+                {c.measures.map((m) => (
+                  <MeasureItem key={`${m.measureId}-${m.side}`} row={m} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </>
+      ) : (
+        // One table, so every value sits under its column's header card (Initial · Retest 1 · Retest 2 · Change).
+        <table className={styles.compareTable} data-testid="compare-table">
+          <caption className={styles.srOnly}>Findings and measurements, by assessment</caption>
+          <colgroup>
+            <col className={styles.colLabel} />
+            {Array.from({ length: valueCols }, (_, i) => (
+              <col key={i} />
             ))}
-          </CompareTable>
-        )}
-      </section>
-
-      {c.measures.length > 0 ? (
-        <section className={styles.compareSection} aria-labelledby="compare-measures-heading">
-          <div className={styles.compareSectionHead}>
-            <h2 id="compare-measures-heading" className={styles.kicker}>Measurements</h2>
-            <span className={styles.countChips} data-testid="measure-counts">
-              {c.measureCounts.improved > 0 ? <span className={styles.changeChip} data-change="improved">{c.measureCounts.improved} improved</span> : null}
-              {c.measureCounts.same > 0 ? <span className={styles.changeChip} data-change="same">{c.measureCounts.same} same</span> : null}
-              {c.measureCounts.worse > 0 ? <span className={styles.changeChip} data-change="worse">{c.measureCounts.worse} worse</span> : null}
-            </span>
-          </div>
-          {phone ? (
-            <ul className={styles.compareList} aria-label="Measurements">
-              {c.measures.map((m) => (
-                <MeasureItem key={`${m.measureId}-${m.side}`} row={m} />
+            <col className={styles.colChange} />
+          </colgroup>
+          <thead>
+            <tr>
+              <td />
+              {done.map((a) => (
+                <th key={a.id} scope="col" className={styles.colHead} data-testid={`compare-col-${a.slot}`}>
+                  <span className={styles.compareColumn}>
+                    <span className={styles.slotName}>{SLOT_LABELS[a.slot]}</span>
+                    <span className={styles.slotMeta}>{day(a.assessedOn)}</span>
+                  </span>
+                </th>
               ))}
-            </ul>
-          ) : (
-            <CompareTable caption="Measurements" names={names}>
+              {retest2 ? (
+                <th scope="col" className={styles.colHead}>
+                  <span className={styles.compareColumn} data-empty="" data-testid="compare-retest2">
+                    <span className={styles.slotName}>Retest 2</span>
+                    <span className={styles.slotMeta}>Not done · optional</span>
+                    {retest2.canStart && !readOnly ? (
+                      <Button variant="secondary" size="compact" onClick={() => setStarting(true)} aria-label="Start Retest 2" phSafe>
+                        Start
+                      </Button>
+                    ) : null}
+                  </span>
+                </th>
+              ) : null}
+              <th scope="col" className={styles.compareChangeHead}>Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className={styles.sectionRow}>
+              <th colSpan={valueCols + 2} scope="colgroup" id="compare-findings-heading">
+                <span className={styles.compareSectionHead}>
+                  <span className={styles.kicker}>Findings</span>
+                  {findingCounts}
+                </span>
+              </th>
+            </tr>
+            {c.findings.length === 0 ? (
+              <tr>
+                <td colSpan={valueCols + 2} className={styles.caption}>{NOTHING_SEEN}</td>
+              </tr>
+            ) : (
+              c.findings.map((f) => (
+                <tr key={`${f.checkpointId}-${f.side}`}>
+                  <th scope="row" data-ph-safe="">{f.label}{SIDE_TEXT[f.side]}</th>
+                  {f.values.map((v, i) => (
+                    <td key={i} data-value={v}>{v === 'not_tested' ? <span className={styles.changeChip} data-change="not_tested">Not tested</span> : VALUE_WORD[v]}</td>
+                  ))}
+                  {retest2 ? <td aria-hidden="true">–</td> : null}
+                  <td><ChangeChip change={f.change} /></td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          {c.measures.length > 0 ? (
+            <tbody>
+              <tr className={styles.sectionRow}>
+                <th colSpan={valueCols + 2} scope="colgroup" id="compare-measures-heading">
+                  <span className={styles.compareSectionHead}>
+                    <span className={styles.kicker}>Measurements</span>
+                    {measureCounts}
+                  </span>
+                </th>
+              </tr>
               {c.measures.map((m) => (
                 <tr key={`${m.measureId}-${m.side}`}>
                   <th scope="row" data-ph-safe="">{m.label}{SIDE_TEXT[m.side]}</th>
@@ -246,10 +295,10 @@ export function CompareView({
                   <td><MeasureDelta row={m} /></td>
                 </tr>
               ))}
-            </CompareTable>
-          )}
-        </section>
-      ) : null}
+            </tbody>
+          ) : null}
+        </table>
+      )}
 
       {slots.muscles}
 
@@ -290,27 +339,6 @@ function ColumnPicker({
           </option>
         ))}
       </select>
-    </div>
-  );
-}
-
-function CompareTable({ caption, names, children }: { caption: string; names: string[]; children: ReactNode }) {
-  return (
-    <div className={styles.compareTableWrap}>
-      <table className={styles.compareTable} style={{ ['--compare-cols' as string]: Math.max(names.length, 3) }}>
-        <caption className={styles.srOnly}>{caption}</caption>
-        <thead className={styles.srOnlyHead}>
-          <tr>
-            <th scope="col">{caption === 'Findings' ? 'Finding' : 'Measure'}</th>
-            {names.map((n) => (
-              <th key={n} scope="col">{n}</th>
-            ))}
-            {names.length < 3 ? <th scope="col">Retest 2</th> : null}
-            <th scope="col">Change</th>
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
     </div>
   );
 }

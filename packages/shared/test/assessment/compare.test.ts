@@ -5,6 +5,7 @@ import {
   formatMeasureDelta,
   formatScoreDelta,
   measureChange,
+  orderColumnPicks,
   type CompareAssessment,
   type CompareMeasure,
   type CompareTest,
@@ -155,6 +156,14 @@ describe('compareAssessments: edge cases', () => {
     expect(c.tests[0]?.name).toBe('Shoulder mobility (v2)');
   });
 
+  it('takes a measure\'s label from the newest version, like findings', () => {
+    const v1 = lib('shoulder_mobility');
+    const v2: TestDefinition = { ...v1, version: 2, measures: [{ ...v1.measures[0]!, label: 'Reach gap' }] };
+    const a = assessment('initial', [test('shoulder_mobility', [], [m('shm.reach_gap', 'L', 14)], 'done', v1)]);
+    const b = assessment('retest_1', [test('shoulder_mobility', [], [m('shm.reach_gap', 'L', 10)], 'done', v2)]);
+    expect(compareAssessments([a, b]).measures.map((x) => x.label)).toEqual(['Reach gap']);
+  });
+
   it('uses higher-is-better for angles and times, and refuses to compare different units', () => {
     const a = assessment('initial', [test('active_straight_leg_raise', [], [m('aslr.angle', 'L', 60, 'deg', true), m('aslr.angle', 'R', 70, 'deg', true)])]);
     const b = assessment('retest_1', [test('active_straight_leg_raise', [], [m('aslr.angle', 'L', 70, 'deg', true), m('aslr.angle', 'R', 70, 'cm', true)])]);
@@ -171,6 +180,19 @@ describe('compareAssessments: edge cases', () => {
     const c = compareAssessments([a, b]);
     expect(c.findings).toEqual([]);
     expect(c.overall).toEqual({ values: [100, 100], delta: 0 });
+  });
+});
+
+describe('orderColumnPicks (phone: two boxes)', () => {
+  it('always reads earlier → later, whichever box picked which', () => {
+    expect(orderColumnPicks([1, 0])).toEqual([0, 1]);
+    expect(orderColumnPicks([2, 0])).toEqual([0, 2]);
+    expect(orderColumnPicks([0, 2])).toEqual([0, 2]);
+    // "From Retest 2, with Initial" compares like "from Initial, with Retest 2": improvements stay improvements.
+    const r2 = assessment('retest_2', retest.tests);
+    const cols = [initial, retest, r2];
+    const [a, b] = orderColumnPicks([2, 0]);
+    expect(compareAssessments([cols[a]!, cols[b]!]).overall).toEqual({ values: [68, 85], delta: 17 });
   });
 });
 

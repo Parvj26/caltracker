@@ -224,6 +224,17 @@ for (const { size, use } of SIZES) {
         await expect(page.getByRole('row', { name: /Head pokes forward/ })).toContainText('Same');
         await expect(page.getByRole('row', { name: /Low back arches/ })).toContainText('New');
         await expect(page.getByRole('row', { name: /Shoulder mobility gap · top hand · L/ })).toContainText('−4 cm');
+        // Each value sits under its column's header card.
+        const knees = page.getByRole('row', { name: /Knees cave in · L\b/ }).getByRole('cell');
+        for (const [i, col] of (['compare-col-initial', 'compare-col-retest_1'] as const).entries()) {
+          const head = (await page.getByTestId(col).boundingBox())!;
+          const cell = (await knees.nth(i).boundingBox())!;
+          expect(Math.abs(head.x - cell.x)).toBeLessThanOrEqual(1);
+          expect(Math.abs(head.width - cell.width)).toBeLessThanOrEqual(1);
+        }
+        // The overall score stays on one line.
+        const overall = (await page.getByTestId('compare-overall').boundingBox())!;
+        expect(overall.height).toBeLessThan(60);
         // Retest 2 is an empty column with Start.
         await expect(page.getByTestId('compare-retest2')).toContainText('Not done');
         await expect(page.getByRole('button', { name: 'Start Retest 2' })).toBeVisible();
