@@ -37,20 +37,28 @@ export function WorkoutPicker({ cellLabel, library, hints, onPick, onClose, forP
       fullScreenOnPhone
     >
       <div className={styles.pickerBody}>
-        {onNew ? (
-          <>
-            <button type="button" className={styles.newWorkout} onClick={onNew}>
-              <span className={styles.newWorkoutPlus} aria-hidden="true">+</span>
-              <span className={styles.newWorkoutText}>
-                <span>New workout</span>
-                <span className={styles.newWorkoutSub}>Build it here. It’s also saved to Workouts.</span>
-              </span>
-            </button>
-            {library.length > 0 ? <p className={styles.pickLabel}>OR PICK ONE YOU’VE MADE</p> : null}
-          </>
-        ) : null}
+        {onNew ? <NewWorkoutOption onNew={onNew} sub="Build it here. It’s also saved to Workouts." orPick={library.length > 0} /> : null}
         <WorkoutChoices library={library} {...(hints ? { hints } : {})} onPick={onPick} forProgram={forProgram} />
       </div>
     </AdaptiveDialog>
+  );
+}
+
+/**
+ * "+ New workout" at the top of a workout picker (a program day, or a client's "Add a workout"), with "OR PICK ONE
+ * YOU'VE MADE" under it when there are workouts to pick.
+ */
+export function NewWorkoutOption({ onNew, sub, orPick, disabled = false }: { onNew: () => void; sub: string; orPick: boolean; disabled?: boolean }) {
+  return (
+    <>
+      <button type="button" className={styles.newWorkout} onClick={onNew} disabled={disabled}>
+        <span className={styles.newWorkoutPlus} aria-hidden="true">+</span>
+        <span className={styles.newWorkoutText}>
+          <span>New workout</span>
+          <span className={styles.newWorkoutSub}>{sub}</span>
+        </span>
+      </button>
+      {orPick ? <p className={styles.pickLabel}>OR PICK ONE YOU’VE MADE</p> : null}
+    </>
   );
 }

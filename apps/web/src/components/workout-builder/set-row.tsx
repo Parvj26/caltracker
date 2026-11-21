@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import {
   setKindOf,
   setKindPatch,
@@ -20,6 +20,7 @@ import type { TrackingType, Units, WorkoutSetDoc } from '@caltracker/shared';
 import { ErrorText } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
 import { Icon } from './icons';
+import { REST_PICKS, activeRestPick, restPickLabel, restPicksShown } from './rest-picks';
 import { SetTypeMenu } from './set-type-menu';
 import styles from './builder.module.css';
 
@@ -44,6 +45,8 @@ type NumberInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'o
   format: (n: number) => string;
   parse: (text: string) => number | null;
   onCommit: (n: number | null) => void;
+  /** Changes when something else set the value (a Rest quick pick): the box drops what was typed and shows it. */
+  resetKey?: number;
 };
 
 /** Selects the whole box, so the next key replaces the number (10 → 8, not 108). */
@@ -58,16 +61,31 @@ function selectAll(el: HTMLInputElement) {
  * On blur it shows the doc's value again, or keeps unreadable text on screen, marked invalid.
  * Tapping or tabbing into a filled box selects its number, so typing replaces it instead of landing mid-number.
  */
-export function NumberInput({ label, value, format, parse, onCommit, className, onFocus, onPointerDown, onPointerUp, ...rest }: NumberInputProps) {
+export function NumberInput({ label, value, format, parse, onCommit, resetKey = 0, className, onFocus, onBlur, onPointerDown, onPointerUp, ...rest }: NumberInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
+  const [shownKey, setShownKey] = useState(resetKey);
+  if (shownKey !== resetKey) {
+    setShownKey(resetKey);
+    setDraft(null);
+  }
   // True during a tap that focuses the box: Safari places the caret when that tap ends, undoing the selection.
   const focusingTap = useRef(false);
   // The doc's value when the box got focus: what an unreadable draft falls back to.
   const atFocus = useRef<number | null>(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // After a quick pick: what an unreadable draft falls back to now, and the box selected so typing replaces it.
+  useEffect(() => {
+    if (resetKey === 0) return;
+    atFocus.current = value;
+    if (inputRef.current) selectAll(inputRef.current);
+    // Only when a pick happened (value is read at that moment).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
   const invalid = draft !== null && Number.isNaN(parse(draft));
   return (
     <input
       {...rest}
+      ref={inputRef}
       onFocus={(e) => {
         onFocus?.(e);
         // An invalid draft kept from the last blur was never saved, so the doc value is still the one to restore.
@@ -100,10 +118,78 @@ export function NumberInput({ label, value, format, parse, onCommit, className, 
         if (n === null || !Number.isNaN(n)) onCommit(n);
         else if (value !== atFocus.current) onCommit(atFocus.current);
       }}
-      onBlur={() => {
+      onBlur={(e) => {
+        onBlur?.(e);
         if (!invalid) setDraft(null);
       }}
     />
+  );
+}
+
+/**
+ * The Rest box, with quick picks (0:30, 1:00, 1:30, 2:00) while it has focus. A pick fills the box in one tap; the
+ * one that matches is black. Pressing a pick never takes focus from the box (pointerdown's default is prevented),
+ * so typing carries on and the keyboard stays up. On a phone the picks sit under the box and are scrolled above the
+ * keyboard; on iPad and desktop they drop down under it.
+ */
+function RestInput({ value, onCommit, stacked }: { value: number | null; onCommit: (n: number | null) => void; stacked: boolean }) {
+  const [focused, setFocused] = useState(false);
+  // Bumps on each pick, so the box shows the picked value even while it holds a typed draft.
+  const [round, setRound] = useState(0);
+  const picksRef = useRef<HTMLDivElement>(null);
+  const shown = restPicksShown({ focused, hasRestBox: true });
+  const active = activeRestPick(value);
+  // Phone: keep the picks in view above the on-screen keyboard (the sheet shrinks to the visible part as it opens).
+  useEffect(() => {
+    if (!shown || !stacked) return;
+    const viewport = window.visualViewport;
+    const reveal = () => picksRef.current?.scrollIntoView({ block: 'nearest' });
+    const timer = setTimeout(reveal, 250);
+    viewport?.addEventListener('resize', reveal);
+    return () => {
+      clearTimeout(timer);
+      viewport?.removeEventListener('resize', reveal);
+    };
+  }, [shown, stacked]);
+  return (
+    <span className={styles.restWrap} data-stacked={stacked || undefined}>
+      <NumberInput
+        resetKey={round}
+        label="Rest (m:ss)"
+        inputMode="numeric"
+        placeholder="m:ss"
+        className={styles.narrow}
+        value={value}
+        format={formatClock}
+        parse={parseClock}
+        onCommit={onCommit}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+      {shown ? (
+        <div ref={picksRef} role="group" aria-label="Quick rest" className={styles.restPicks}>
+          {REST_PICKS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              tabIndex={-1}
+              aria-pressed={p === active}
+              className={styles.restPick}
+              data-ph-capture-attribute-label="workout_rest_pick"
+              // Keep focus (and the keyboard) on the Rest box.
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onCommit(p);
+                setRound((r) => r + 1);
+              }}
+            >
+              {restPickLabel(p)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </span>
   );
 }
 
@@ -292,16 +378,7 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
             straight into the next one. */}
         {showRest && !isDrop ? (
           <Field caption={stacked ? 'Rest after' : 'Rest'} col="rest">
-            <NumberInput
-              label="Rest (m:ss)"
-              inputMode="numeric"
-              placeholder="m:ss"
-              className={styles.narrow}
-              value={set.restSeconds}
-              format={formatClock}
-              parse={parseClock}
-              onCommit={(n) => onChange({ restSeconds: n ?? 0 })}
-            />
+            <RestInput value={set.restSeconds} stacked={stacked} onCommit={(n) => onChange({ restSeconds: n ?? 0 })} />
           </Field>
         ) : null}
       </div>

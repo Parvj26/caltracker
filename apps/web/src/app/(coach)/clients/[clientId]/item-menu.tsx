@@ -8,7 +8,11 @@ import { calendarAddDomId, calendarItemDomId, type CalendarItem } from '@/compon
 import { formatShortDay } from '@/components/calendar/format';
 import { shouldOpenUp } from '@/components/calendar/menu-placement';
 import { QuickDayPicker } from '@/components/assign/quick-day-picker';
-import { AdaptiveDialog, Button, type AdaptiveDialogHandle } from '@/components/ui';
+import { errorMessage, type ErrorCode } from '@caltracker/shared';
+import { AdaptiveDialog, Button, TextField, type AdaptiveDialogHandle } from '@/components/ui';
+import { cx } from '@/components/ui/cx';
+import { failureCode } from '@/lib/action-errors';
+import { saveToLibrary } from './actions';
 import type { CalendarEntry } from './client-calendar';
 import styles from '@/components/calendar/calendar.module.css';
 import { useBackLayer } from '@/lib/open-layer';
@@ -29,6 +33,8 @@ export function ItemMenu({
   onMove,
   moveLabel = 'Move to…',
   onCopy,
+  onSaveToLibrary,
+  inLibrary = false,
   onDelete,
 }: {
   item: CalendarItem;
@@ -42,6 +48,10 @@ export function ItemMenu({
   moveLabel?: string;
   /** "Copy to…": the workout as it is, onto another day and/or other clients. */
   onCopy?: (() => void) | undefined;
+  /** "Save to Library": its plan as a new library workout. */
+  onSaveToLibrary?: (() => void) | undefined;
+  /** Still exactly a library workout: "✓ In Library", greyed out, instead of "Save to Library". */
+  inLibrary?: boolean;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -203,12 +213,47 @@ export function ItemMenu({
               </button>
             </li>
           ) : null}
+          {onSaveToLibrary ? (
+            <li role="none">
+              {inLibrary ? (
+                // Shown but not usable (still reachable with the arrow keys, so it is read out).
+                <button
+                  type="button"
+                  role="menuitem"
+                  aria-disabled="true"
+                  ref={(el) => {
+                    itemsRef.current[6] = el;
+                  }}
+                  className={cx(styles.menuItem, styles.menuItemDone)}
+                  onClick={(e) => e.preventDefault()}
+                >
+                  <span aria-hidden="true">✓{"\u00a0"}</span>In Library
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  ref={(el) => {
+                    itemsRef.current[6] = el;
+                  }}
+                  className={styles.menuItem}
+                  data-ph-capture-attribute-label="calendar_save_to_library"
+                  onClick={() => {
+                    setOpen(false);
+                    onSaveToLibrary();
+                  }}
+                >
+                  Save to Library
+                </button>
+              )}
+            </li>
+          ) : null}
           <li role="none">
             <button
               type="button"
               role="menuitem"
               ref={(el) => {
-                itemsRef.current[6] = el;
+                itemsRef.current[7] = el;
               }}
               className={styles.menuItem}
               onClick={() => {
@@ -364,6 +409,91 @@ export function DeleteDialog({
         Removes it from {clientName}&apos;s calendar on {formatShortDay(entry.date)}. Your library isn&apos;t changed.
         {entry.logId ? ' The workout they logged stays in Activity.' : ''}
       </p>
+    </AdaptiveDialog>
+  );
+}
+
+/* ---------- Save to Library: a name clash ---------- */
+
+/**
+ * "Save to Library" when the Library already has a workout with this name: asks for another, starting from
+ * "<name> (<first name>, <day>)". Saving with a name that is still taken says so here.
+ */
+export function LibraryNameDialog({
+  entry,
+  suggestion,
+  onSaved,
+  onClose,
+}: {
+  entry: CalendarEntry;
+  suggestion: string;
+  onSaved: (saved: { id: string; name: string }) => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<AdaptiveDialogHandle>(null);
+  const [name, setName] = useState(suggestion);
+  const [error, setError] = useState<ErrorCode | null>(null);
+  const [pending, setPending] = useState(false);
+  // Back to the item's ⋯ button when done (the menu that opened this is gone).
+  useEffect(
+    () => () => {
+      focusSoon(calendarItemDomId(entry.id));
+    },
+    [entry.id],
+  );
+  async function save() {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const outcome = await saveToLibrary({ workoutId: entry.id, name });
+      if (outcome.ok) {
+        const saved = { id: outcome.id, name: outcome.name };
+        void dialogRef.current?.close().then(() => onSaved(saved));
+        return;
+      }
+      setError(outcome.code);
+    } catch (e) {
+      setError(failureCode(e, 'library_save_failed'));
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <AdaptiveDialog
+      ref={dialogRef}
+      historyId={`library-name-${entry.id}`}
+      title="Save to Library"
+      titleSafe
+      onClose={onClose}
+      busy={pending}
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => dialogRef.current?.requestClose()} disabled={pending}>
+            Cancel
+          </Button>
+          <Button onClick={() => void save()} pending={pending} disabled={name.trim() === ''} data-ph-capture-attribute-label="calendar_library_name_save">
+            {pending ? 'Saving…' : 'Save'}
+          </Button>
+        </>
+      }
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <TextField
+          label="Name"
+          value={name}
+          maxLength={100}
+          onChange={(e) => setName(e.target.value)}
+          hint={`“${entry.name}” is already in your Library.`}
+          hintSafe={false}
+          error={error ? { code: error, text: errorMessage(error) } : undefined}
+        />
+      </form>
     </AdaptiveDialog>
   );
 }

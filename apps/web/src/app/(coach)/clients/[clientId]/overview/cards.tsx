@@ -27,7 +27,8 @@ import {
   type Units,
 } from '@caltracker/shared';
 import { LocalDate } from '@/app/(coach)/workouts/local-date';
-import { Card } from '@/components/ui';
+import { ButtonLink, Card } from '@/components/ui';
+import { ChevronIcon } from '@/components/ui/chevron-icon';
 import type { ClientOverview, OverviewEvent } from '@/lib/client-overview';
 import { UPDATES_SHOWN } from '@/lib/client-overview';
 import { LineChart } from '../progress/line-chart';
@@ -52,14 +53,32 @@ function Tracked({ label, count }: { label: string; count: TrackedCount }) {
   );
 }
 
+/**
+ * A card's title row as one link (title, an optional note such as "All time", and a chevron), so the whole row opens
+ * the page behind the card. The card holds no second link to the same place.
+ */
+function CardHeadLink({ href, id, title, note }: { href: string; id: string; title: string; note?: string }) {
+  return (
+    <Link href={href} className={styles.cardHeadLink}>
+      <h2 id={id} className={styles.heading}>{title}</h2>
+      <span className={styles.cardHeadEnd}>
+        {note ? <span className={styles.caption}>{note}</span> : null}
+        <ChevronIcon direction="right" />
+      </span>
+    </Link>
+  );
+}
+
 export function TrainingCard({ data, today }: { data: ClientOverview; today: IsoDate }) {
   const s = trainingSummary(data.workouts, data.addedFinishedAt.map((at) => localDateOf(at)), today);
+  // Nothing ever planned or added: one line instead of three empty boxes (the Today card above has "+ Add workout").
+  const none = data.workouts.length === 0 && data.addedFinishedAt.length === 0;
   return (
     <Card className={styles.card} aria-labelledby="training-heading">
-      <div className={styles.cardHead}>
-        <h2 id="training-heading" className={styles.heading}>Training</h2>
-        <Link href={`/clients/${data.clientId}/training`} className={styles.link}>Open calendar</Link>
-      </div>
+      <CardHeadLink href={`/clients/${data.clientId}/training`} id="training-heading" title="Training" />
+      {none ? (
+        <p className={styles.caption}>No workouts yet.</p>
+      ) : (
       <dl className={styles.stats}>
         <Tracked label="Last 7 days" count={s.last7} />
         <Tracked label="Last 30 days" count={s.last30} />
@@ -71,19 +90,18 @@ export function TrainingCard({ data, today }: { data: ClientOverview; today: Iso
           </dd>
         </div>
       </dl>
+      )}
     </Card>
   );
 }
 
 export function HighlightsCard({ data, units }: { data: ClientOverview; units: Units }) {
+  // The title row opens the client's bests and stickers (on the Training tab).
   const h = data.highlights;
   const lifted = `${Math.round(fromKg(h.volumeKg, units)).toLocaleString('en-GB')} ${units}`;
   return (
     <Card className={styles.card} aria-labelledby="highlights-heading">
-      <div className={styles.cardHead}>
-        <h2 id="highlights-heading" className={styles.heading}>Highlights</h2>
-        <span className={styles.caption}>All time</span>
-      </div>
+      <CardHeadLink href={`/clients/${data.clientId}/training#bests-heading`} id="highlights-heading" title="Highlights" note="All time" />
       <dl className={styles.stats}>
         <div className={styles.stat}>
           <dt>Stickers</dt>
@@ -98,10 +116,7 @@ export function HighlightsCard({ data, units }: { data: ClientOverview; units: U
           <dd>{h.personalBests}</dd>
         </div>
       </dl>
-      <p className={styles.caption}>
-        {h.workouts === 1 ? '1 workout' : `${h.workouts} workouts`} finished.{' '}
-        <Link href={`/clients/${data.clientId}/training#bests-heading`} className="tap-inline">See bests and stickers</Link>
-      </p>
+      <p className={styles.caption}>{h.workouts === 1 ? '1 workout' : `${h.workouts} workouts`} finished.</p>
     </Card>
   );
 }
@@ -115,23 +130,31 @@ export function BodyMetricsCard({ data, units, today, readOnly }: { data: Client
   const metrics = bodyOverview(data.scans, period, today);
   const shown = metrics.find((m) => m.key === chosen)!;
   const periodId = 'body-period';
+  // The grey "Add"-style button (as on Clients' "Assign"); not for a past client.
+  const logMetric = readOnly ? null : (
+    <ButtonLink href={`${metricsTabHref(data.clientId)}?sheet=log-metric`} variant="quiet" size="compact" className={styles.cardAction}>
+      + Log metric
+    </ButtonLink>
+  );
   return (
     <Card className={styles.card} aria-labelledby="body-heading">
-      <div className={styles.cardHead}>
-        <h2 id="body-heading" className={styles.heading}>Body metrics</h2>
-        <div className={styles.periodRow}>
-          <label htmlFor={periodId} className={styles.caption}>Period</label>
-          <select id={periodId} className={styles.periodSelect} value={period} onChange={(e) => setPeriod(e.target.value as OverviewPeriod)}>
-            {OVERVIEW_PERIODS.map((p) => (
-              <option key={p} value={p}>{OVERVIEW_PERIOD_LABELS[p]}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <CardHeadLink href={metricsTabHref(data.clientId)} id="body-heading" title="Body metrics" />
       {data.scans.length === 0 ? (
-        <p className={styles.caption}>Nothing logged yet.</p>
+        <div className={styles.emptyRow}>
+          <p className={styles.caption}>Nothing logged yet.</p>
+          {logMetric}
+        </div>
       ) : (
         <>
+          {/* The period only matters once there is something to chart (4 weeks to start with). */}
+          <div className={styles.periodRow}>
+            <label htmlFor={periodId} className={styles.caption}>Period</label>
+            <select id={periodId} className={styles.periodSelect} value={period} onChange={(e) => setPeriod(e.target.value as OverviewPeriod)}>
+              {OVERVIEW_PERIODS.map((p) => (
+                <option key={p} value={p}>{OVERVIEW_PERIOD_LABELS[p]}</option>
+              ))}
+            </select>
+          </div>
           <ul className={styles.metrics} aria-label="Pick a measure to chart">
             {metrics.map((m) => (
               <li key={m.key}>
@@ -177,17 +200,9 @@ export function BodyMetricsCard({ data, units, today, readOnly }: { data: Client
                 : `No ${METRICS[shown.key].label.toLowerCase()} yet.`}
             </p>
           )}
+          {logMetric ? <div className={styles.cardActions}>{logMetric}</div> : null}
         </>
       )}
-      <p className={styles.caption}>
-        {readOnly ? null : (
-          <>
-            <Link href={`${metricsTabHref(data.clientId)}?sheet=log-metric`} className="tap-inline">+ Log metric</Link>
-            {' · '}
-          </>
-        )}
-        <Link href={metricsTabHref(data.clientId)} className="tap-inline">All metrics</Link>
-      </p>
     </Card>
   );
 }

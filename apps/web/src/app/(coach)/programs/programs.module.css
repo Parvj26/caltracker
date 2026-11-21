@@ -555,11 +555,25 @@
 .sheetHeader { display: flex; align-items: center; gap: var(--ct-space-3); }
 /* The sheet's top-bar Save: phones only (below), where the keyboard covers the editor's own save bar. */
 .sheetHeader .sheetTopSave { display: none; flex: none; }
+.sheetHeader .sheetTopSaveAlways { display: inline-flex; }
+/* "Also save to Library" (a client's new workout): beside Save from iPad up; its own row under the title on a phone. */
+.sheetLibraryToggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--ct-space-2);
+  min-height: var(--ct-tap-min);
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+}
+.sheetLibraryToggle input { width: 22px; height: 22px; margin: 0; accent-color: var(--ct-ink); }
 .sheetDiscard { margin: 0; }
 .sheetNote { margin: 0; font-size: var(--ct-size-caption); color: var(--ct-ink-muted); }
 .sheetBody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 599.98px) {
   .sheetHeader .sheetTopSave { display: inline-flex; }
+  .sheetHeader:has(.sheetLibraryToggle) { flex-wrap: wrap; }
+  .sheetHeader .sheetLibraryToggle { order: 3; flex-basis: 100%; }
   .sheet {
     width: 100vw;
     max-width: none;

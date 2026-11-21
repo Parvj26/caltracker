@@ -12,10 +12,18 @@ import {
 } from '@caltracker/shared';
 import { setFavourite } from '@/app/(coach)/workouts/actions';
 import { failureCode } from '@/lib/action-errors';
-import { exerciseImageUrl, loadExerciseDetail, loadExerciseIndex, rememberFavourite, type LoadedExerciseIndex } from '@/lib/exercise-index';
+import {
+  exerciseImageUrl,
+  invalidateExerciseIndex,
+  loadExerciseDetail,
+  loadExerciseIndex,
+  rememberFavourite,
+  type LoadedExerciseIndex,
+} from '@/lib/exercise-index';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { Button, ErrorText, SearchBox, SearchEmpty, useSearchQuery } from '@/components/ui';
 import { cx } from '@/components/ui/cx';
+import { CreateFromSearch, type CreatedExercise } from './create-exercise';
 import { FilterChips, hasActiveFilters } from './filter-chips';
 import { Preview } from './preview';
 import { ResultList } from './result-list';
@@ -254,6 +262,34 @@ export function SearchPanel({
     }
   }
 
+  /** A custom exercise made from this search ("+ Create …"): reload the list, then pick it (tick it, or mark it). */
+  async function onCreated(created: CreatedExercise) {
+    invalidateExerciseIndex();
+    try {
+      const fresh = await loadExerciseIndex(supabase, workspaceId);
+      setData(fresh);
+      setFavourites(new Set(fresh.favourites));
+    } catch {
+      setError(true);
+    }
+    // Its own name finds it, whatever was typed (filters could hide a new exercise with no muscles or equipment).
+    setQuery(created.name);
+    setFilters(NO_FILTERS);
+    onFiltersChange?.(NO_FILTERS);
+    setHighlightId(created.id);
+    if (many) setSelected((cur) => (cur.some((x) => x.id === created.id) || cur.length >= max ? cur : [...cur, created]));
+    searchRef.current?.focus();
+  }
+
+  /** "Did you mean …? Use it": show that exercise and pick it. */
+  function useExisting(row: ExerciseIndexRow) {
+    setQuery(row.name);
+    if (hasActiveFilters(filters)) changeFilters(NO_FILTERS);
+    setHighlightId(row.id);
+    if (many && !selectedIds.has(row.id)) toggleSelected(row);
+    searchRef.current?.focus();
+  }
+
   function changeFilters(next: SearchFilters) {
     setFilters(next);
     setShown(PAGE_SIZE);
@@ -317,8 +353,14 @@ export function SearchPanel({
                 {hasActiveFilters(filters) ? (
                   <Button variant="secondary" onClick={() => changeFilters(NO_FILTERS)}>Clear filters</Button>
                 ) : null}
-                <Link href="/exercises/new" className={styles.link} target="_blank">Create a custom exercise</Link>
+                {debounced.trim() ? null : (
+                  <Link href="/exercises/new" className={styles.link} target="_blank">Create a custom exercise</Link>
+                )}
               </div>
+              {/* Nothing matched what was typed: make it here, without leaving the picker. */}
+              {debounced.trim() ? (
+                <CreateFromSearch query={debounced} rows={data.index} onCreated={(c) => void onCreated(c)} onUse={useExisting} />
+              ) : null}
             </div>
           ) : (
             <ResultList

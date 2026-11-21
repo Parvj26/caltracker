@@ -3587,6 +3587,26 @@ export type Database = {
         Args: { p_log_id: string; p_sets: Json }
         Returns: number
       }
+      create_client_workout: {
+        Args: {
+          p_client_id: string
+          p_date: string
+          p_doc: Json
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      create_client_workout_row: {
+        Args: {
+          p_client_id: string
+          p_date: string
+          p_id: string
+          p_name: string
+          p_notes: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       create_community_post: {
         Args: {
           p_body: string
@@ -3801,6 +3821,10 @@ export type Database = {
         Args: { p_community_id: string; p_user_id: string }
         Returns: undefined
       }
+      rename_invite: {
+        Args: { p_first_name: string; p_invite_id: string; p_last_name: string }
+        Returns: undefined
+      }
       report_community_content: {
         Args: {
           p_comment_id?: string
@@ -3916,6 +3940,7 @@ export type Database = {
         Returns: number
       }
       unregister_push_device: { Args: { p_token: string }; Returns: undefined }
+      untouched_library_copies: { Args: { p_ids: string[] }; Returns: string[] }
       update_workspace_name: { Args: { p_name: string }; Returns: undefined }
       uuid_text_ok: { Args: { t: string }; Returns: boolean }
       valid_substitute_set: { Args: { v: Json }; Returns: boolean }

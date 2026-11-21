@@ -110,8 +110,9 @@ test('the rail legal links and the clients list are easy to tap', async ({ page 
 
 test('client overview links, calendar controls and other small links are easy to tap', async ({ page }) => {
   await page.goto(CLIENT);
-  await expectTappable(page.getByRole('link', { name: 'See bests and stickers' }));
-  await expectTappable(page.getByRole('link', { name: /^(\+ Log metric|All metrics)$/ }));
+  // Each card's title row is one link (Training, Highlights, Body metrics), and + Log metric is a button-sized link.
+  await expectTappable(page.getByRole('link', { name: /^(Training|Highlights All time|Body metrics)$/ }).filter({ has: page.locator('h2') }));
+  await expectTappable(page.getByRole('link', { name: '+ Log metric' }));
 
   await page.goto(`${CLIENT}/training`);
   await expectTappable(page.getByRole('navigation', { name: 'Calendar view' }).getByRole('link'));

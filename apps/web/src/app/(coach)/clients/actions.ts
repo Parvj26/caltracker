@@ -9,6 +9,7 @@ import {
   SendInvitesResponse,
   invitePlanArgs,
   invitePlanError,
+  splitFullName,
   type ErrorCode,
   type IsoDate,
 } from '@caltracker/shared';
@@ -147,4 +148,119 @@ export async function cancelInvite(inviteId: string): Promise<SimpleOutcome> {
   if (data.length === 0) return fail('invite_already_used', 'action:clients.cancelInvite');
   revalidatePath('/clients');
   return { ok: true };
+}
+
+/** A pending invite's new name (one "Name" field: the first word is the first name). Saved as the coach leaves the field. */
+export async function renameInvite(inviteId: string, name: string): Promise<SimpleOutcome> {
+  await requireCoach();
+  if (!UUID.test(inviteId)) return fail('request_invalid', 'action:clients.renameInvite');
+  const { firstName, lastName } = splitFullName(typeof name === 'string' ? name : '');
+  const checked = InviteInput.pick({ firstName: true, lastName: true }).safeParse({ firstName, lastName });
+  if (!checked.success) return fail('invite_first_name_invalid', 'action:clients.renameInvite');
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.rpc('rename_invite', { p_invite_id: inviteId, p_first_name: checked.data.firstName, p_last_name: checked.data.lastName });
+  if (error) {
+    if (error.code === '55000') return fail('invite_already_used', 'action:clients.renameInvite');
+    return fail('invite_rename_failed', 'action:clients.renameInvite');
+  }
+  revalidatePath('/clients');
+  return { ok: true };
+}
+
+/** "Change plan" on a pending invite: replaces what it starts with (set_invite_plan, the same rules as the invite window). */
+export async function updateInvitePlan(input: { inviteId: string; plan: InvitePlan; today: IsoDate }): Promise<SimpleOutcome> {
+  await requireCoach();
+  if (!UUID.test(input.inviteId)) return fail('request_invalid', 'action:clients.updateInvitePlan');
+  const plan = InvitePlan.safeParse(input.plan);
+  if (!plan.success) return fail('invite_plan_invalid', 'action:clients.updateInvitePlan');
+  if (plan.data.kind !== 'none') {
+    const badToday = todayError(input.today);
+    if (badToday) return fail(badToday, 'action:clients.updateInvitePlan');
+    const badPlan = dateCode(invitePlanError(plan.data, input.today));
+    if (badPlan) return fail(badPlan, 'action:clients.updateInvitePlan');
+  }
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.rpc('set_invite_plan', { p_invite_id: input.inviteId, ...invitePlanArgs(plan.data) });
+  if (error) {
+    if (error.code === '55000') return fail('invite_already_used', 'action:clients.updateInvitePlan');
+    return fail('invite_plan_save_failed', 'action:clients.updateInvitePlan');
+  }
+  revalidatePath('/clients');
+  return { ok: true };
+}
+
+export type ChangeEmailOutcome =
+  | ActionFailure
+  | {
+      ok: true;
+      result: SendInvitesResponse['results'][number];
+      /** The new invite, once one is open for the new email (the old one is then cancelled). */
+      inviteId: string | null;
+      planError: ErrorCode | null;
+      /** False when the old invite couldn't be cancelled: its link may still work. */
+      oldCancelled: boolean;
+    };
+
+/**
+ * "Save and resend to <new email>" on a pending invite: invites the new email the usual way (send-invite, with its
+ * cooldown and limits), keeps the old invite's name and plan with it, then cancels the old invite so its link stops
+ * working. Nothing changes when the new invite can't be sent (for example the email is already a client).
+ */
+export async function changeInviteEmail(input: { inviteId: string; email: string; today: IsoDate }): Promise<ChangeEmailOutcome> {
+  const { workspaceId } = await requireCoach();
+  if (!UUID.test(input.inviteId)) return fail('request_invalid', 'action:clients.changeInviteEmail');
+  const supabase = await createServerSupabase();
+  const { data: old, error: oldError } = await supabase
+    .from('client_invites')
+    .select('id, email, first_name, last_name, client_invite_plan_items(program_id, workout_id, start_on, position)')
+    .eq('id', input.inviteId)
+    .eq('workspace_id', workspaceId)
+    .is('accepted_at', null)
+    .maybeSingle();
+  if (oldError) return fail('invite_send_failed', 'action:clients.changeInviteEmail');
+  if (!old) return fail('invite_already_used', 'action:clients.changeInviteEmail');
+  const invite = InviteInput.safeParse({ email: input.email, firstName: old.first_name, lastName: old.last_name });
+  if (!invite.success) return fail('invite_email_invalid', 'action:clients.changeInviteEmail');
+  if (invite.data.email.toLowerCase() === old.email.toLowerCase()) return fail('invite_email_same', 'action:clients.changeInviteEmail');
+
+  const sent = await sendInvites([invite.data]);
+  if (!sent.ok) return sent;
+  const result = sent.results[0];
+  if (!result) return fail('invite_send_failed', 'action:clients.changeInviteEmail');
+  if (!INVITE_OPEN.has(result.status)) return { ok: true, result, inviteId: null, planError: null, oldCancelled: false };
+
+  const fresh = await supabase
+    .from('client_invites')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('email', invite.data.email)
+    .is('accepted_at', null)
+    .maybeSingle();
+  const newId = fresh.error ? null : (fresh.data?.id ?? null);
+
+  // The same plan, from today on (a day that has gone by would land on the day they join anyway).
+  const today = todayError(input.today) ? null : input.today;
+  const items = [...old.client_invite_plan_items].sort((a, b) => a.position - b.position);
+  const day = (d: string) => (today && d < today ? today : d);
+  const first = items[0];
+  const plan: InvitePlan =
+    first?.program_id
+      ? { kind: 'program', programId: first.program_id, startOn: day(first.start_on) }
+      : items.some((i) => i.workout_id)
+        ? { kind: 'workouts', items: items.flatMap((i) => (i.workout_id ? [{ workoutId: i.workout_id, on: day(i.start_on) }] : [])) }
+        : { kind: 'none' };
+  const planFailed: ErrorCode | null = plan.kind === 'none' ? null : plan.kind === 'program' ? 'invite_plan_program_failed' : 'invite_plan_workouts_failed';
+  let planError: ErrorCode | null = null;
+  if (newId) {
+    const kept = await supabase.rpc('set_invite_plan', { p_invite_id: newId, ...invitePlanArgs(plan) });
+    if (kept.error) planError = planFailed;
+  } else {
+    // The new invite couldn't be found to keep the plan with it: say so (as inviteClient does).
+    planError = planFailed;
+  }
+  // The old link stops working (checked: only a deleted row means it did).
+  const gone = await supabase.from('client_invites').delete().eq('id', old.id).eq('workspace_id', workspaceId).is('accepted_at', null).select('id');
+  const oldCancelled = !gone.error && gone.data.length > 0;
+  revalidatePath('/clients');
+  return { ok: true, result, inviteId: newId, planError, oldCancelled };
 }
