@@ -21,6 +21,7 @@ import { requireCoach } from '@/lib/auth';
 import { checkpointLabels, findingsFrom, loadMarks, loadPicks } from '@/lib/assessment-findings';
 import { getClient } from '@/lib/page-data';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { CompareMapsCard } from './compare-columns';
 import type { AssessmentDetail } from './load';
 import { assessmentHref } from './links';
 import styles from './assessments.module.css';
@@ -117,23 +118,13 @@ export async function ReportSuggestedWorkout({ clientId, assessment }: ReportSlo
   );
 }
 
-/** A small confirmed body map per assessment of the cycle. */
+/** A small confirmed body map per assessment of the cycle (on a phone, the two picked: CompareMapsCard). */
 export async function CompareBodyMaps({ columns }: CompareSlotProps) {
-  const all = await Promise.all(columns.map(async (a) => ({ a, states: markStates(confirmedMarks((await marksOf(a.id)).marks)) })));
-  if (all.every((c) => Object.keys(c.states).length === 0)) return null;
-  return (
-    <Card className={styles.card} aria-labelledby="compare-maps-heading" data-testid="compare-maps">
-      <h2 id="compare-maps-heading" className={styles.heading}>Body map · coach-confirmed</h2>
-      <div className={styles.compareMaps}>
-        {all.map(({ a, states }) => (
-          <section key={a.id} aria-label={SLOT_LABELS[a.slot]} className={styles.compareMap}>
-            <h3 className={styles.kicker}>{SLOT_LABELS[a.slot]}</h3>
-            <FindingsMap states={states} size="small" allViews label={`${SLOT_LABELS[a.slot]} findings`} />
-          </section>
-        ))}
-      </div>
-    </Card>
+  const all = await Promise.all(
+    columns.map(async (a) => ({ id: a.id, label: SLOT_LABELS[a.slot], states: markStates(confirmedMarks((await marksOf(a.id)).marks)) })),
   );
+  if (all.every((c) => Object.keys(c.states).length === 0)) return null;
+  return <CompareMapsCard columns={all} />;
 }
 
 const STATUS_TEXT: Record<MarkStatus, string> = { over: '↑ Over', under: '↓ Under', normal: '✓ Normal' };

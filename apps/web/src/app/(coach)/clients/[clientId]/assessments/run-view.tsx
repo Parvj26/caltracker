@@ -28,6 +28,9 @@ const SIDE_WORD: Record<Side, string> = { L: 'left', R: 'right', none: '' };
 const UNIT: Record<MeasureDef['unit'], string> = { cm: 'cm', deg: '°', s: 's' };
 const AUTOSAVE_MS = 700;
 
+/** Server renders this tab has already shown. Seeing one again means a cached copy (Back, the iPhone back swipe). */
+const shownRenders = new Set<string>();
+
 type SaveState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'saved' } | { kind: 'error'; code: ErrorCode };
 
 /** Where to open: ?test=N when given, else the first test not yet looked at (resume), else the last. */
@@ -46,10 +49,42 @@ const severityOf = (results: readonly CheckpointResult[], id: string, side: Side
  * side with Normal pre-selected (tap Slight or Severe again to go back to Normal), measurements, the heel-lift
  * follow-up, "Type done", discomfort L / R, Stop test, a note. Every change is saved as a draft a moment later, so
  * the coach can close it and pick it up again where they left off.
+ *
+ * Never on old data: a cached copy of the page (browser Back from Findings, the back swipe, the back-forward cache)
+ * reloads itself from the server at the address's test, and every save sends the test's revision, so a screen that
+ * is somehow still stale gets "Reload — this assessment changed" instead of writing over newer marks.
  */
-export function RunView({ client, assessment, testFromUrl }: { client: { id: string; name: string }; assessment: AssessmentDetail; testFromUrl: number | null }) {
+export function RunView({
+  client,
+  assessment,
+  testFromUrl,
+  renderId,
+}: {
+  client: { id: string; name: string };
+  assessment: AssessmentDetail;
+  testFromUrl: number | null;
+  /** Unique per server render (see shownRenders). */
+  renderId: string;
+}) {
   const router = useRouter();
   const tests = assessment.tests;
+  // Decided on mount, so a cached copy never paints its old marks (the server render is always fresh).
+  const [stale, setStale] = useState(() => typeof window !== 'undefined' && shownRenders.has(renderId));
+  useEffect(() => {
+    if (stale) window.location.reload();
+    else shownRenders.add(renderId);
+  }, [stale, renderId]);
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      setStale(true);
+      window.location.reload();
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
+  // The revision each test was loaded or last saved at.
+  const revisions = useRef<Record<string, number>>(Object.fromEntries(tests.map((t) => [t.id, t.revision])));
   const [index, setIndex] = useState(() => startIndex(tests, testFromUrl));
   const [entries, setEntriesState] = useState<Record<string, TestEntry>>(() => Object.fromEntries(tests.map((t) => [t.id, t.entry])));
   // The newest entries for saves that run after a render (autosave timer, the save queue).
@@ -74,11 +109,12 @@ export function RunView({ client, assessment, testFromUrl }: { client: { id: str
       const toSave = status ? { ...entry, status } : entry;
       setSave({ kind: 'saving' });
       try {
-        const outcome = await saveAssessmentTest(testId, toSave);
+        const outcome = await saveAssessmentTest(testId, toSave, revisions.current[testId] ?? 0);
         if (!outcome.ok) {
           setSave({ kind: 'error', code: outcome.code });
           return false;
         }
+        revisions.current[testId] = outcome.revision;
         if (status) setEntries((all) => ({ ...all, [testId]: { ...(all[testId] ?? toSave), status } }));
         setSave({ kind: 'saved' });
         return true;
@@ -151,7 +187,7 @@ export function RunView({ client, assessment, testFromUrl }: { client: { id: str
     router.push(`/clients/${client.id}/limitations`);
   }
 
-  if (!test) return <div className={styles.run} aria-busy="true" />;
+  if (!test || stale) return <div className={styles.run} aria-busy="true" data-testid={stale ? 'assessment-run-reloading' : undefined} />;
   const entry = entries[test.id] ?? test.entry;
   const def = test.definition;
   const last = index === tests.length - 1;
@@ -183,7 +219,7 @@ export function RunView({ client, assessment, testFromUrl }: { client: { id: str
       {save.kind === 'error' ? (
         <div className={styles.saveError}>
           <ErrorText code={save.code} />
-          {save.code === 'stale_deploy' ? <ReloadButton className={calendar.smallButton} /> : null}
+          {save.code === 'stale_deploy' || save.code === 'assessment_changed' ? <ReloadButton className={calendar.smallButton} /> : null}
         </div>
       ) : null}
       <PhoneActionBar status={status ? <span className={styles.statusOk}>{status}</span> : undefined} label="Test actions">

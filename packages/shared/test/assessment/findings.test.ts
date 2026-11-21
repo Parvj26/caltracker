@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findingChips, observedFindings } from '../../src/assessment/findings';
+import { checkpointLabelMap, findingChips, observedFindings } from '../../src/assessment/findings';
 import { BUILTIN_TESTS } from '../../src/assessment/library';
 import type { CheckpointResult, TestDefinition } from '../../src/assessment/types';
 
@@ -9,6 +9,29 @@ const test = (key: string): TestDefinition => {
   return t;
 };
 const r = (checkpointId: string, side: CheckpointResult['side'], severity: CheckpointResult['severity']): CheckpointResult => ({ checkpointId, side, severity });
+
+describe('checkpointLabelMap', () => {
+  it('names the test when two tests have the same words, and only then', () => {
+    const labels = checkpointLabelMap([test('overhead_squat'), test('single_leg_squat')]);
+    expect(labels['ohs.knee_valgus']).toBe('Knees cave in · Overhead squat');
+    expect(labels['sls.knee_valgus']).toBe('Knee caves in · Single-leg squat');
+    expect(labels['ohs.heel_rise']).toBe('Heels lift');
+    expect(checkpointLabelMap([test('overhead_squat')])['ohs.knee_valgus']).toBe('Knees cave in');
+  });
+
+  it('the built-in library: every label is unique once disambiguated', () => {
+    const labels = Object.values(checkpointLabelMap(BUILTIN_TESTS));
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('observedFindings uses the same words', () => {
+    const findings = observedFindings([
+      { definition: test('overhead_squat'), status: 'done', results: [r('ohs.knee_valgus', 'L', 'slight')] },
+      { definition: test('single_leg_squat'), status: 'done', results: [r('sls.knee_valgus', 'L', 'severe')] },
+    ]);
+    expect(findings.map((f) => f.label)).toEqual(['Knee caves in · Single-leg squat', 'Knees cave in · Overhead squat']);
+  });
+});
 
 describe('observedFindings', () => {
   it('lists only Slight and Severe lines, worst first, posture last', () => {

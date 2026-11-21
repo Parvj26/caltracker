@@ -205,7 +205,7 @@ export function WorkoutSheet({
     >
       <header className={styles.sheetHeader}>
         <div className={styles.sheetHeading}>
-          <span className={styles.eyebrow}>
+          <span className={cx(styles.eyebrow, styles.sheetEyebrow)}>
             {forClient ? target.clientName : programName} · {where}
           </span>
           <h2 id={titleId} className={styles.dialogTitle}>
@@ -223,10 +223,18 @@ export function WorkoutSheet({
             keeps Save here on every size, beside "Also save to Library". */}
         <Button
           className={cx(styles.sheetTopSave, forClient && styles.sheetTopSaveAlways)}
+          aria-label={target.kind === 'suggested' ? 'Assign to client' : undefined}
           onClick={saveFromTop}
           data-ph-capture-attribute-label={target.kind === 'suggested' ? 'suggested_workout_assign' : target.kind === 'client' ? 'client_new_workout_save' : 'program_sheet_top_save'}
         >
-          {target.kind === 'suggested' ? 'Assign to client' : 'Save'}
+          {target.kind === 'suggested' ? (
+            // "Assign" on a phone, so the title keeps to one line beside it.
+            <>
+              Assign<span className={styles.sheetWideOnly}> to client</span>
+            </>
+          ) : (
+            'Save'
+          )}
         </Button>
         {/* The one close style (rulebook §5.2): a 44 px grey circle with ×, top right. */}
         <button type="button" className={ad.close} aria-label="Close" onClick={close}>
@@ -252,7 +260,7 @@ export function WorkoutSheet({
       {/* A workout for one client: their open flags under the title (board AS10). */}
       {forClient ? <FlagReminderLoader clientId={target.clientId} /> : null}
       {target.kind === 'suggested' ? (
-        <p className={styles.sheetNote}>{countExercises(target.doc)} · sets and reps filled in from each exercise’s default. Nothing reaches {target.clientName} until you assign it.</p>
+        <p className={styles.sheetNote}>Nothing reaches {target.clientName} until you assign it.</p>
       ) : null}
       {target.kind === 'new' ? (
         <p className={styles.sheetNote}>Saving puts it on {where} and in your Workouts list, then brings you back to the program.</p>
@@ -306,11 +314,6 @@ export function WorkoutSheet({
     </dialog>
   );
 }
-
-const countExercises = (doc: WorkoutDoc) => {
-  const n = doc.blocks.reduce((sum, b) => sum + b.exercises.length, 0);
-  return `${n} ${n === 1 ? 'exercise' : 'exercises'}`;
-};
 
 /** "Assign to <client>": the day (quick days or Pick a date…), then Assign · <day>. A question over the sheet. */
 function DayDialog({ clientName, today, onAnswer }: { clientName: string; today: IsoDate; onAnswer: (d: IsoDate | null) => void }) {
