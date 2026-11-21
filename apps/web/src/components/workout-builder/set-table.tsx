@@ -17,44 +17,40 @@ type Props = {
   errors: ReadonlyMap<string, string[]>;
   onUpdate: (setId: string, patch: SetPatch) => void;
   onRemove: (setId: string) => void;
-  /** The phone exercise editor: each set as a card with one labelled line per box (see SetRow). */
-  stacked?: boolean;
+  /** The phone exercise editor: smaller boxes, "Wt" at three or more boxes. */
+  compact?: boolean;
 };
 
 /**
- * An exercise's sets: each a small card with a caption above each box (iPad, desktop), or stacked on a phone. The wide
- * builder's right pane lays the rows out as a table instead: one caption row on top (rendered here, shown only there)
- * and every row on the same columns, which `--set-cols` sizes to this exercise's boxes.
+ * An exercise's sets as one slim table (approved mockups CW7), the same on every size: the column names once on top
+ * (Set · Type · the boxes the exercise tracks · Rest), then one row per set on the same columns, ending in a fixed
+ * slot for × (or, on touch screens, the focused box's − / +). `--set-cols` sizes the columns to this exercise's boxes.
+ * `compact` (a phone): at three or more boxes the weight column is called "Wt".
  */
-export function SetTable({ sets, names, trackingType, units, restShown, errors, onUpdate, onRemove, stacked = false }: Props) {
+export function SetTable({ sets, names, trackingType, units, restShown, errors, onUpdate, onRemove, compact = false }: Props) {
   const fields = targetFieldsFor(trackingType);
-  // Reps and weight have − / + buttons on touch screens, so their columns never get narrower than 9.5rem (two 44 px buttons and a box that fits "102.5").
-  const STEPPED = 'minmax(9.5rem, 1.5fr)';
-  const PLAIN = 'minmax(5rem, 1fr)';
-  const columns: [caption: string, size: string][] = [
-    ...(fields.includes('reps') ? [['Reps', STEPPED] as [string, string]] : []),
-    ...(fields.includes('weight') ? [[`Weight (${units})`, STEPPED] as [string, string]] : []),
-    ...(fields.includes('duration') ? [['Time', PLAIN] as [string, string]] : []),
-    ...(fields.includes('distance') ? [[`Distance (${distanceUnitFor(units)})`, PLAIN] as [string, string]] : []),
+  const hasRest = sets.some((s, i) => restShown[i] && s.setType !== 'drop');
+  const boxes = fields.length + (hasRest ? 1 : 0);
+  const weightName = compact && boxes >= 3 ? `Wt (${units})` : `Weight (${units})`;
+  const columns: string[] = [
+    ...(fields.includes('reps') ? ['Reps'] : []),
+    ...(fields.includes('weight') ? [weightName] : []),
+    ...(fields.includes('duration') ? ['Time'] : []),
+    ...(fields.includes('distance') ? [`Distance (${distanceUnitFor(units)})`] : []),
     // Same rule as SetRow: a drop never has a rest box.
-    ...(sets.some((s, i) => restShown[i] && s.setType !== 'drop') ? [['Rest', PLAIN] as [string, string]] : []),
+    ...(hasRest ? ['Rest'] : []),
   ];
-  // Four boxes (weight, reps, time and rest) don't fit a 700 px pane with the buttons, so the pane drops them there and
-  // every box shares the width (the boxes still take typing).
-  const many = columns.length > 3;
-  const sizes = columns.map(([, size]) => (many ? PLAIN : size));
-  const style = { '--set-cols': `40px 64px ${sizes.join(' ')} var(--ct-tap-min)` } as CSSProperties;
+  // Number, type letter, one share of the width per box (at most 8rem each, so short rows don't stretch), the tray.
+  const style = { '--set-cols': `var(--set-num) var(--set-type) repeat(${columns.length}, minmax(0, 8rem)) 1fr var(--set-tray)` } as CSSProperties;
   return (
-    <div className={styles.sets} style={style} data-many={many ? '' : undefined}>
-      {stacked ? null : (
-        <div className={styles.setColumns} aria-hidden="true">
-          <span>Set</span>
-          <span>Type</span>
-          {columns.map(([caption]) => (
-            <span key={caption}>{caption}</span>
-          ))}
-        </div>
-      )}
+    <div className={styles.sets} style={style} data-compact={compact || undefined} data-many={boxes >= 3 || undefined}>
+      <div className={styles.setColumns} aria-hidden="true">
+        <span>Set</span>
+        <span>Type</span>
+        {columns.map((caption) => (
+          <span key={caption}>{caption}</span>
+        ))}
+      </div>
       {sets.map((s, si) => (
         <SetRow
           key={s.id}
@@ -64,12 +60,13 @@ export function SetTable({ sets, names, trackingType, units, restShown, errors, 
           trackingType={trackingType}
           units={units}
           showRest={restShown[si]!}
+          restColumn={hasRest}
           canRemove={sets.length > 1}
           canDrop={si > 0}
           errors={errors.get(`set:${s.id}`) ?? []}
           onChange={(patch) => onUpdate(s.id, patch)}
           onRemove={() => onRemove(s.id)}
-          stacked={stacked}
+          compact={compact}
         />
       ))}
     </div>

@@ -87,7 +87,7 @@ export function SubstituteEditor({ block, exerciseIndex, substitute: sub, units,
           errors={errors}
           onUpdate={actions.onUpdateSet}
           onRemove={actions.onRemoveSet}
-          stacked={stacked}
+          compact={stacked}
         />
         <div className={styles.exerciseFooter}>
           <AddSetButton label={`Add a set to substitute ${sub.exerciseName}`} onClick={actions.onAddSet} />

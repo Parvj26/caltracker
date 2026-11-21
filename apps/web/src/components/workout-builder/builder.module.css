@@ -91,39 +91,54 @@
 .exerciseNote .input { width: 100%; }
 
 /* ---------- Set rows ---------- */
-/* Each set is a small card (approved editor mockup): its number, the type letter, one box per target with a caption
-   above it, and a × in the top-right corner. Rows wrap on narrow screens; a drop is indented under the set above. */
-.sets { display: flex; flex-direction: column; gap: var(--ct-space-2); }
-.setRow {
-  position: relative;
+/* An exercise's sets as one slim table on every size (approved mockups CW7, set-table.tsx): the column names once on
+   top, then one row per set on the same columns (number, type letter, one box per target, rest, then a fixed slot for
+   × or, on touch screens, the focused box's − / +). SetTable sets --set-cols; the sizes below feed it. */
+.sets {
+  --set-num: 24px;
+  --set-type: 48px;
+  --set-tray: var(--ct-tap-min);
   display: flex;
   flex-direction: column;
-  gap: var(--ct-space-1);
-  padding: var(--ct-space-3) calc(var(--ct-tap-min) + var(--ct-space-2)) var(--ct-space-3) var(--ct-space-3);
+  gap: var(--ct-space-2);
+}
+.setColumns, .setRow {
+  display: grid;
+  grid-template-columns: var(--set-cols);
+  align-items: center;
+  column-gap: var(--ct-space-2);
+}
+.setColumns {
+  padding: 0 calc(var(--ct-space-2) + var(--ct-border-width-card));
+  font-size: var(--ct-size-caption);
+  font-weight: var(--ct-weight-caption);
+  color: var(--ct-ink-muted);
+  white-space: nowrap;
+}
+.setColumns > span { overflow: visible; }
+.setRow {
+  position: relative;
+  row-gap: var(--ct-space-1);
+  min-height: 60px;
+  padding: var(--ct-space-1) var(--ct-space-2);
   border: var(--ct-border-width-card) solid var(--ct-border);
   border-radius: var(--ct-radius-button);
   background: var(--ct-bg);
+  /* Focusing a box scrolls its row into view below the (sticky) column names. */
+  scroll-margin-top: 40px;
+  scroll-margin-bottom: var(--ct-space-4);
 }
-.dropRow { margin-left: var(--ct-space-6); }
-.setCells { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ct-space-3); }
-.setLabel {
-  align-self: center;
-  min-width: 20px;
-  margin-top: var(--ct-space-4);
-  font-weight: var(--ct-weight-button);
-  font-variant-numeric: tabular-nums;
-}
-.field { display: flex; flex-direction: column; gap: var(--ct-space-1); }
-.fieldCaption { font-size: var(--ct-size-caption); font-weight: var(--ct-weight-caption); color: var(--ct-ink-muted); }
-.fieldBox { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
-.unit { color: var(--ct-ink-muted); }
+.setRow[data-focus] { border-color: var(--ct-ink); }
+.setLabel { font-weight: var(--ct-weight-button); font-variant-numeric: tabular-nums; }
+.dropRow .setLabel { padding-left: var(--ct-space-2-5); }
+.setCell { display: flex; min-width: 0; }
+.setCell .narrow { flex: 1; width: 0; min-width: 0; min-height: var(--ct-tap-min); padding-inline: var(--ct-space-1); text-align: center; }
+.setTray { grid-column: -2 / -1; display: flex; justify-content: flex-end; gap: var(--ct-space-1); }
 .narrow { width: 6rem; min-height: 48px; text-align: right; font-variant-numeric: tabular-nums; }
 .removeSet {
-  position: absolute;
-  top: var(--ct-space-1);
-  right: var(--ct-space-1);
   display: grid;
   place-items: center;
+  flex: none;
   width: var(--ct-tap-min);
   height: var(--ct-tap-min);
   padding: 0;
@@ -135,9 +150,15 @@
 }
 .removeSet:hover:not(:disabled) { background: var(--ct-surface); }
 .removeSet:disabled { cursor: not-allowed; color: var(--ct-ink-muted); }
-.rowError { padding-left: var(--ct-space-6); }
-/* The caption row above the sets: only the wide builder's right pane shows it (see the end of this file). */
-.setColumns { display: none; }
+.rowError { grid-column: 1 / -1; }
+/* A phone: tighter columns so three boxes and the tray fit; the boxes' numbers a little larger, so they read at a glance. */
+.sets[data-compact] { --set-num: 22px; --set-type: 44px; }
+.sets[data-compact] .setColumns, .sets[data-compact] .setRow { column-gap: var(--ct-space-1); }
+.sets[data-compact] .setRow { padding-inline: var(--ct-space-1); }
+.sets[data-compact] .setColumns { padding-inline: calc(var(--ct-space-1) + var(--ct-border-width-card)); }
+.sets[data-compact] .setCell .narrow { padding-inline: 2px; font-size: 17px; font-weight: var(--ct-weight-button); }
+/* Three or more boxes on a phone: 16 px (the smallest Safari doesn't zoom in on), so "102.5" still fits. */
+.sets[data-compact][data-many] .setCell .narrow { font-size: 16px; }
 
 /* Set type: one letter (W warm-up, N normal, F failure, D drop set), coloured from the design tokens. */
 .typeWrap { position: relative; }
@@ -410,7 +431,6 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 /* ---------- Phones, iPads and other touch screens ---------- */
 /* Desktop with a mouse: nothing below changes it. The fold line, the ⋯ menu and the steppers are hidden there. */
 .fold, .stepButton { display: none; }
-.stepper { display: inline-flex; align-items: center; gap: var(--ct-space-1); }
 
 /* The ⋯ menu (same look as the calendar's item menu). */
 .menuWrap { position: relative; flex: none; }
@@ -514,7 +534,10 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
     touch-action: manipulation;
   }
   .stepButton:active { background: var(--ct-surface); }
-  .stepper .narrow { width: 4.5rem; }
+  /* Touch: the tray is wide enough for − and +; while the reps or weight box has focus they take the × spot. */
+  .sets { --set-tray: calc(2 * var(--ct-tap-min) + var(--ct-space-1)); }
+  .setTray .stepButton { height: var(--ct-tap-min); }
+  .setTray[data-stepping] .removeSet { display: none; }
 }
 
 /* iPad portrait: each card folds to one line ("Bench Press" / "4 × 8 @ 60 kg · rest 1:30"); one is open at a time.
@@ -847,7 +870,10 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 .phoneEditorTitle .blockNumber { flex: none; min-width: 34px; height: 34px; }
 .phoneEditorName { flex: 1; min-width: 0; margin: 0; font-size: 22px; font-weight: var(--ct-weight-button); overflow-wrap: anywhere; }
 .phoneEditorName .swapName { font-size: inherit; font-weight: inherit; }
-.phoneEditorBody { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--ct-space-3); padding: var(--ct-space-3-5) var(--ct-space-4) var(--ct-space-6); overflow-y: auto; }
+/* The column names stay on top while the sets scroll under them. */
+.phoneEditorBody .setColumns { position: sticky; top: calc(-1 * var(--ct-space-3-5)); z-index: 3; padding-block: var(--ct-space-1); background: var(--ct-bg); }
+.phoneEditorBar[hidden] { display: none; }
+.phoneEditorBody { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: var(--ct-space-3); padding: var(--ct-space-3-5) var(--ct-space-3) var(--ct-space-6); overflow-y: auto; }
 .phoneExercise { display: flex; flex-direction: column; gap: var(--ct-space-3); }
 .phoneExercise + .phoneExercise { padding-top: var(--ct-space-3); border-top: var(--ct-border-width-card) solid var(--ct-border); }
 .phoneDetails { padding: 0 var(--ct-space-3-5); border: var(--ct-border-width-card) solid var(--ct-border); border-radius: var(--ct-radius-button); }
@@ -880,18 +906,6 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 }
 
 /* A set as a card in the phone editor: "Set 1", its type and ×, then one labelled line per box with − / +. */
-.setRow[data-layout='stacked'] { gap: var(--ct-space-2-5); padding: var(--ct-space-3); border-radius: var(--ct-radius-card); }
-.setRow[data-layout='stacked'].dropRow { margin-left: var(--ct-space-4); }
-.setHead { display: flex; align-items: center; gap: var(--ct-space-2); }
-.setHeadName { font-weight: var(--ct-weight-button); }
-.setHead .typeWrap { margin-right: auto; }
-.setHead .removeSet { position: static; color: var(--ct-ink-muted); }
-.setRow[data-layout='stacked'] .setCells { flex-direction: column; align-items: stretch; gap: var(--ct-space-2); }
-.setRow[data-layout='stacked'] .field { flex-direction: row; align-items: center; gap: var(--ct-space-2); min-width: 0; }
-.setRow[data-layout='stacked'] .fieldCaption { flex: none; width: 84px; font-size: 14px; }
-.setRow[data-layout='stacked'] .fieldBox, .setRow[data-layout='stacked'] .stepper { display: flex; flex: 1; min-width: 0; }
-.setRow[data-layout='stacked'] .fieldBox .narrow { flex: 1; width: 0; min-width: 0; text-align: center; font-size: 18px; font-weight: var(--ct-weight-button); }
-.setRow[data-layout='stacked'] .unit { display: none; }
 
 /* ---------- Wide screens: two panes (approved "Wide workout builder" mockup) ----------
    When the builder has at least 1100 px (a desktop window of about 1360 px or more), the exercises are compact rows
@@ -941,37 +955,6 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   .block[data-pane] .blockBody { gap: var(--ct-space-3-5); }
   .block[data-pane] .blockHeader > .blockTools, .block[data-pane] .exerciseHeader > .blockTools { margin-right: 0; }
 
-  /* The sets as a table across the pane (approved mockup): one caption row on top instead of a caption over every box,
-     then each set on the same columns (number, type, one per box, ×), which SetTable sizes in --set-cols. */
-  .block[data-pane] .setColumns,
-  .block[data-pane] .setRow:not([data-layout='stacked']) {
-    display: grid;
-    grid-template-columns: var(--set-cols);
-    align-items: center;
-    column-gap: var(--ct-space-2-5);
-  }
-  .block[data-pane] .setColumns {
-    padding: 0 calc(var(--ct-space-3) + var(--ct-border-width-card));
-    font-size: var(--ct-size-caption);
-    font-weight: var(--ct-weight-caption);
-    color: var(--ct-ink-muted);
-  }
-  .block[data-pane] .setRow:not([data-layout='stacked']) { row-gap: var(--ct-space-1); padding: var(--ct-space-2) var(--ct-space-3); }
-  .block[data-pane] .setRow:not([data-layout='stacked']) .setCells { display: contents; }
-  .block[data-pane] .setRow:not([data-layout='stacked']) .fieldCaption,
-  .block[data-pane] .setRow:not([data-layout='stacked']) .unit { display: none; }
-  .block[data-pane] .setRow:not([data-layout='stacked']) .setLabel { margin-top: 0; }
-  .block[data-pane] .setRow:not([data-layout='stacked']) .field { min-width: 0; }
-  .block[data-pane] .setRow:not([data-layout='stacked']) .fieldBox,
-  .block[data-pane] .setRow:not([data-layout='stacked']) .fieldBox .stepper { display: flex; flex: 1; min-width: 0; }
-  .block[data-pane] .setRow:not([data-layout='stacked']) .fieldBox .narrow { flex: 1; width: 0; min-width: 0; text-align: center; }
-  .block[data-pane] .setRow:not([data-layout='stacked']) .stepper .narrow { padding-inline: var(--ct-space-1); }
-  .block[data-pane] .sets[data-many] .setRow:not([data-layout='stacked']) .stepButton { display: none; }
-  .block[data-pane] .setRow:not([data-layout='stacked']) .removeSet { position: static; grid-column: -2 / -1; justify-self: end; }
-  .block[data-pane] .setRow:not([data-layout='stacked']) > .rowError { grid-column: 1 / -1; padding-left: 0; }
-  /* A drop keeps the columns; its number is indented instead of the whole row. */
-  .block[data-pane] .dropRow:not([data-layout='stacked']) { margin-left: 0; }
-  .block[data-pane] .dropRow:not([data-layout='stacked']) .setLabel { padding-left: var(--ct-space-3); }
   .paneMenu { flex: none; }
 }
 
@@ -987,10 +970,9 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
 .saveButton.saveHidden { display: none; }
 
 /* The Rest box's quick picks (set-row.tsx RestInput): only while the box has focus. iPad and desktop: a small card
-   dropping down under the box. Phone (the stacked editor): a row under the box, inside the set card. */
-.restWrap { position: relative; display: inline-flex; flex: 1 1 auto; min-width: 0; }
-.restWrap[data-stacked] { display: flex; flex-direction: column; gap: var(--ct-space-2); width: 100%; }
-.setRow[data-layout='stacked'] .fieldBox .restWrap[data-stacked] .narrow { flex: none; width: 100%; }
+   dropping down under the box, over the rows below, so the row keeps its height. */
+.restWrap { position: relative; display: flex; flex: 1; min-width: 0; }
+.restWrap .narrow { flex: 1; width: 0; min-width: 0; }
 /* The Rest box is the row's last column: the card lines up with its right edge, so it never runs off the screen. */
 .restPicks {
   position: absolute;
@@ -1004,7 +986,6 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   background: var(--ct-bg);
   box-shadow: var(--ct-shadow-sticker), 0 0 0 1px var(--ct-border);
 }
-.restWrap[data-stacked] .restPicks { position: static; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 0; box-shadow: none; background: none; }
 .restPick {
   min-width: var(--ct-tap-min);
   min-height: var(--ct-tap-min);
@@ -1023,3 +1004,38 @@ div.titleField input:not(#none) { font-size: var(--ct-size-section-heading) !imp
   /* Desktop with a mouse: 24 px targets are enough (WCAG 2.5.8), so the card stays small. */
   .restPick { min-height: 36px; }
 }
+
+/* "+ Set ▾" on a linked superset (superset-add-set.tsx): the main part adds a round, ▾ opens "Only <name>". */
+.splitAddSet {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  flex: none;
+  min-height: 48px;
+  border: var(--ct-border-width-card) solid var(--ct-ink);
+  border-radius: var(--ct-radius-input);
+  background: var(--ct-bg);
+}
+.splitMain, .splitToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ct-space-1);
+  border: 0;
+  background: none;
+  color: var(--ct-ink);
+  font: inherit;
+  font-weight: var(--ct-weight-button);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.splitMain { padding: 0 var(--ct-space-4); border-radius: var(--ct-radius-input) 0 0 var(--ct-radius-input); }
+.splitToggle { min-width: var(--ct-tap-min); border-left: var(--ct-border-width-card) solid var(--ct-ink); border-radius: 0 var(--ct-radius-input) var(--ct-radius-input) 0; }
+.splitMain:hover, .splitToggle:hover, .splitToggle[aria-expanded='true'] { background: var(--ct-surface); }
+.splitMain:focus-visible, .splitToggle:focus-visible { outline: 2px solid var(--ct-ink); outline-offset: 2px; }
+.splitMenu { left: 0; right: auto; min-width: 14rem; }
+/* Phone editor's bottom bar: two lines, as tall as Done, and the menu opens upward. */
+.splitAddSetPhone { flex: 1; min-height: 56px; border-radius: var(--ct-radius-button); }
+.splitAddSetPhone .splitMain { flex: 1; flex-direction: column; gap: 0; font-size: 17px; }
+.splitAddSetPhone .addSetHint { white-space: nowrap; }
+.splitAddSetPhone .splitMenu { top: auto; bottom: 100%; margin: 0 0 var(--ct-space-1); }
