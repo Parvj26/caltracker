@@ -25,7 +25,7 @@ import {
   type Units,
   type WorkoutDoc,
 } from '@caltracker/shared';
-import { MarkChip, sidesText } from '@/components/assessment-findings/findings-map';
+import { MarkChip, sidesText } from '@/components/assessment-findings/labels';
 import { ReloadButton } from '@/components/reload-button';
 import { Button, ErrorText, PhoneActionBar } from '@/components/ui';
 import { failureCode } from '@/lib/action-errors';

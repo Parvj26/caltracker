@@ -1,6 +1,6 @@
 import { ALSO_CHECKS, type AlsoCheckId } from '@caltracker/shared';
 import type { FindingRow } from '@/lib/assessment-findings';
-import { MarkChip, muscleSidesLabel } from './findings-map';
+import { MarkChip, muscleSidesLabel } from './labels';
 import styles from './findings.module.css';
 
 const SECTION: Record<FindingRow['status'], string> = {
