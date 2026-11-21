@@ -33,8 +33,10 @@ select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.p
 select ok(not has_function_privilege('authenticated', 'private.copy_limitations_to_flags()', 'execute')
   and not has_function_privilege('anon', 'private.copy_limitations_to_flags()', 'execute'),
   'nobody signed in can run the note copy');
-select ok(not has_table_privilege('authenticated', 'public.client_limitations', 'insert')
-  and not has_table_privilege('authenticated', 'public.client_limitations', 'update')
+select ok(not has_column_privilege('authenticated', 'public.client_limitations', 'body', 'insert')
+  and not has_column_privilege('authenticated', 'public.client_limitations', 'body', 'update')
+  and not has_column_privilege('authenticated', 'public.client_limitations', 'client_id', 'insert')
+  and not has_column_privilege('authenticated', 'public.client_limitations', 'workspace_id', 'insert')
   and has_table_privilege('authenticated', 'public.client_limitations', 'select'),
   'the old note is read-only now (still readable, never written)');
 
