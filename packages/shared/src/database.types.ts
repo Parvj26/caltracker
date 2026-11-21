@@ -3428,6 +3428,7 @@ export type Database = {
       }
       admin_view_as_snapshot: { Args: { p_user_id: string }; Returns: Json }
       apply_award: { Args: { p_log_id: string; p_result: Json }; Returns: Json }
+      assessment_write_allowed: { Args: never; Returns: boolean }
       assign_program: {
         Args: {
           p_assignment_id: string
