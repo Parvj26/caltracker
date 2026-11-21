@@ -30,7 +30,39 @@ async function shot(page: Page, name: string) {
 }
 
 /** The UI audit's in-page rules, inside one open pop-up. */
+/**
+ * Waits until the page's own requests have been quiet for `quietMs`: no router fetch still in flight after an action
+ * (closing a pop-up, a server action's revalidate). Opening a pop-up while one is pending makes Next.js reload the
+ * whole page (an app race, reported in PR #197), which would take the pop-up away mid-test. Call it right after the
+ * action, so the fetch it starts is counted. (page.waitForLoadState('networkidle') can't do this: on a page that has
+ * already loaded it returns at once.)
+ */
+async function settle(page: Page, quietMs = 500) {
+  let inFlight = 0;
+  let lastChange = Date.now();
+  const started = () => {
+    inFlight += 1;
+    lastChange = Date.now();
+  };
+  const ended = () => {
+    inFlight = Math.max(0, inFlight - 1);
+    lastChange = Date.now();
+  };
+  page.on('request', started);
+  page.on('requestfinished', ended);
+  page.on('requestfailed', ended);
+  try {
+    await expect.poll(() => inFlight === 0 && Date.now() - lastChange >= quietMs, { timeout: 15_000, intervals: [100] }).toBe(true);
+  } finally {
+    page.off('request', started);
+    page.off('requestfinished', ended);
+    page.off('requestfailed', ended);
+  }
+}
+
 async function auditPopup(page: Page, size: Size, scope = 'dialog[open]') {
+  // Pop-ups open with a light scale and fade: measure them once their animations have finished.
+  await page.locator(scope).first().evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
   // A filled search box shows its × inside the box, by design.
   const allow = [{ i: 0, rule: 'overlap', selector: '[aria-label="Clear search"]' }];
   const result = await page.evaluate(auditInPage, { minTarget: size === 'desktop' ? 24 : 44, allow, scope });
@@ -245,7 +277,9 @@ for (const { size, use } of SIZES) {
         .single();
       cleanup.push(() => admin.from('client_invites').delete().eq('workspace_id', workspaceId).like('last_name', `%${tag}`));
       await signInAsCoach(page);
+      const filtered = settle(page);
       await showInvites(page);
+      await filtered;
 
       // The whole row opens it; Resend and ⋯ stay on the row.
       const row = page.locator(`[data-invite-id="${fresh.data!.id}"]`);
@@ -290,8 +324,13 @@ for (const { size, use } of SIZES) {
       const moved = await admin.from('client_invites').select('id, first_name, last_name, client_invite_plan_items(program_id)').eq('email', newEmail).single();
       expect(moved.data).toMatchObject({ first_name: 'Ana', last_name: `Maria Torres ${tag}` });
       if (programs.data?.[0]) expect(moved.data!.client_invite_plan_items).toEqual([{ program_id: programs.data[0].id }]);
+      // Closing starts a router fetch for the page under it: let it finish before the next pop-up opens (opened during
+      // it, Next.js reloads the whole page; an app race, reported in PR #197).
+      const closed = settle(page);
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog')).toBeHidden();
+      await expect(page).not.toHaveURL(/[?&]sheet=/);
+      await closed;
 
       // Expired: the chip, and Resend invite leads.
       const expiredRow = page.locator(`[data-invite-id="${expired.data!.id}"]`);
