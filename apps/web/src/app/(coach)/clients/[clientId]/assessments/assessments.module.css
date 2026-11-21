@@ -407,7 +407,8 @@
 .colLabel { width: 30%; }
 .colChange { width: 7.5em; }
 .compareTable th, .compareTable td { padding: var(--ct-space-3) var(--ct-space-2) var(--ct-space-3) var(--ct-space-3); border-bottom: var(--ct-border-width-card) solid var(--ct-border); text-align: left; vertical-align: middle; overflow-wrap: anywhere; }
-.compareTable thead th, .compareTable thead td { padding: 0 var(--ct-space-2) var(--ct-space-2) 0; border-bottom: 0; vertical-align: bottom; font-weight: inherit; }
+.compareTable thead th, .compareTable thead td { padding: 0 var(--ct-space-2) var(--ct-space-2) 0; border-bottom: 0; vertical-align: top; font-weight: inherit; }
+.compareTable thead .compareChangeHead { vertical-align: bottom; }
 .compareTable thead th:last-child { padding-right: 0; }
 .compareChangeHead { text-align: right !important; font-size: var(--ct-size-caption); font-weight: var(--ct-weight-button) !important; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ct-ink-muted); }
 .compareTable tbody th[scope='row'] { padding-left: 0; font-weight: var(--ct-weight-button); }

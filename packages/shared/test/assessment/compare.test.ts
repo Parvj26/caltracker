@@ -189,7 +189,7 @@ describe('orderColumnPicks (phone: two boxes)', () => {
     expect(orderColumnPicks([2, 0])).toEqual([0, 2]);
     expect(orderColumnPicks([0, 2])).toEqual([0, 2]);
     // "From Retest 2, with Initial" compares like "from Initial, with Retest 2": improvements stay improvements.
-    const r2 = assessment('retest_2', retest.tests);
+    const r2 = assessment('retest_2', [...retest.tests]);
     const cols = [initial, retest, r2];
     const [a, b] = orderColumnPicks([2, 0]);
     expect(compareAssessments([cols[a]!, cols[b]!]).overall).toEqual({ values: [68, 85], delta: 17 });
