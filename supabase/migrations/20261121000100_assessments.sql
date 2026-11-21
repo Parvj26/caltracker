@@ -94,7 +94,9 @@ create table public.assessment_tests (
   workspace_id uuid not null,
   assessment_id uuid not null,
   position smallint not null check (position between 0 and 49),
-  definition_id uuid not null references public.assessment_test_definitions,
+  -- The library row it was started from. Set null if that row is ever deleted (a coach's own test, with its
+  -- workspace): the copy below is what the assessment keeps.
+  definition_id uuid references public.assessment_test_definitions on delete set null,
   -- Copied from the definition row by the trigger below; never sent by the app.
   test_key text not null,
   definition_version integer not null,

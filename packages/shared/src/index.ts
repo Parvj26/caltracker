@@ -786,4 +786,4 @@ export { clientCopyName, libraryNameKey, libraryNameTaken } from './workouts/lib
 export { compactExerciseName, exerciseNameKey, findNearDuplicate, sameExerciseName } from './exercises/near-duplicate';
 
 // Movement assessments (Limitations & injuries tab).
-export * from './assessment';
+export * from './assessment/index';

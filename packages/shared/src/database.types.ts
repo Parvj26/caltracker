@@ -259,7 +259,7 @@ export type Database = {
         Row: {
           assessment_id: string
           definition: Json
-          definition_id: string
+          definition_id: string | null
           definition_version: number
           discomfort_left: boolean
           discomfort_right: boolean
@@ -277,7 +277,7 @@ export type Database = {
         Insert: {
           assessment_id: string
           definition: Json
-          definition_id: string
+          definition_id?: string | null
           definition_version: number
           discomfort_left?: boolean
           discomfort_right?: boolean
@@ -295,7 +295,7 @@ export type Database = {
         Update: {
           assessment_id?: string
           definition?: Json
-          definition_id?: string
+          definition_id?: string | null
           definition_version?: number
           discomfort_left?: boolean
           discomfort_right?: boolean
