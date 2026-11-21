@@ -26,10 +26,11 @@ for (const [device, size] of [
     await library(page).click();
     await expect(library(page)).toHaveAttribute('aria-expanded', 'true');
     const choices = menu(page).getByRole('menuitem');
-    await expect(choices).toHaveCount(3);
+    await expect(choices).toHaveCount(4);
     await expect(choices.nth(0)).toHaveAccessibleName('Workouts Single sessions');
     await expect(choices.nth(1)).toHaveAccessibleName(/^Exercise library/);
     await expect(choices.nth(2)).toHaveAccessibleName(/^Programs/);
+    await expect(choices.nth(3)).toHaveAccessibleName(/^Corrective/);
     await expect(choices.nth(0)).toBeFocused();
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/library-${size.width}.png` });
     const button = (await library(page).boundingBox())!;
@@ -99,7 +100,7 @@ test('on desktop Library opens in place in the sidebar, open and lit on library 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('menu')).toHaveCount(0);
   const items = sub(page).getByRole('link');
-  await expect(items).toHaveText(['Workouts', 'Exercise library', 'Programs']);
+  await expect(items).toHaveText(['Workouts', 'Exercise library', 'Programs', 'Corrective']);
   // Indented under Library.
   const lib = (await library(page).boundingBox())!;
   const first = (await items.nth(0).boundingBox())!;

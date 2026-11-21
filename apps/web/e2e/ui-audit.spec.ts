@@ -25,8 +25,8 @@ type AuditPage = { name: string; path: string };
 // checked too (an empty feed would hide them).
 // `bodyMetrics`: two weight entries the coach logged, so the Body cards and a metric's page have a trend.
 // `strengthLog`: two finished squat workouts for the demo client, so Metrics' Strength rows and the exercise page show.
-// `assessment`: a fresh client with a finished Initial (ratings, numbers, notes) and a Retest 1 draft, so the tab's
-// cycle card and findings, the summary and the run screen are all checked.
+// `assessment`: a fresh client with a finished Initial and Retest 1 (ratings, numbers, notes) and a Retest 2 draft, so the tab's
+// cycle card and findings, the report, the run screen, Compare and the templates page are all checked.
 type Group = { name: string; pages: AuditPage[]; seed?: true; communityPost?: true; strengthLog?: true; bodyMetrics?: true; assessment?: true; signedOut?: AuditPage[] };
 
 const GROUPS: Group[] = [
@@ -83,6 +83,8 @@ const GROUPS: Group[] = [
       { name: 'Assessments tab', path: '/clients/:client/limitations' },
       { name: 'Assessment summary', path: '/clients/:client/assessments/:done' },
       { name: 'Assessment run', path: '/clients/:client/assessments/:draft' },
+      { name: 'Assessment compare', path: '/clients/:client/assessments/compare/:cycle' },
+      { name: 'Assessment templates', path: '/corrective/templates' },
     ],
   },
   {
@@ -95,8 +97,8 @@ const GROUPS: Group[] = [
   },
 ];
 
-/** A fresh client of the demo workspace with a finished Initial and a Retest 1 draft. Delete the user to clean up. */
-async function seedAssessments(admin: ReturnType<typeof serviceClient>): Promise<{ client: string; done: string; draft: string }> {
+/** A fresh client of the demo workspace with a finished Initial and Retest 1, a Retest 2 draft and a template. Delete the user to clean up. */
+async function seedAssessments(admin: ReturnType<typeof serviceClient>): Promise<{ client: string; done: string; draft: string; cycle: string; template: string }> {
   const ws = await demoWorkspace(admin);
   const client = await freshClient(admin, ws, 'Audit', `Assess${unique().slice(-5)}`);
   const must = <R extends { data: unknown; error: unknown }>(r: R): NonNullable<R['data']> => {
@@ -108,7 +110,7 @@ async function seedAssessments(admin: ReturnType<typeof serviceClient>): Promise
   const def = (key: string) => defs.find((d) => d.test_key === key)!.id;
   const cycle = must(await admin.from('assessment_cycles').insert({ workspace_id: ws, client_id: client, number: 1 }).select('id').single());
   const today = new Date().toISOString().slice(0, 10);
-  const start = async (slot: 'initial' | 'retest_1', keys: string[]) => {
+  const start = async (slot: 'initial' | 'retest_1' | 'retest_2', keys: string[]) => {
     const a = must(await admin.from('assessments').insert({ workspace_id: ws, client_id: client, cycle_id: cycle.id, slot, assessed_on: today, foot_arch_left: 'flat', foot_arch_right: 'normal' }).select('id').single());
     const tests = must(
       await admin.from('assessment_tests').insert(keys.map((k, i) => ({ workspace_id: ws, assessment_id: a.id, position: i, definition_id: def(k), test_key: k, definition_version: 1, definition: {} }))).select('id, test_key'),
@@ -134,8 +136,28 @@ async function seedAssessments(admin: ReturnType<typeof serviceClient>): Promise
   );
   must(await admin.from('assessment_tests').update({ status: 'done', note: 'Calves felt tight', follow_ups: { 'ohs.heel_lift_retest': 'better' } }).eq('assessment_id', initial.id).select('id'));
   must(await admin.from('assessments').update({ status: 'done', score: 79 }).eq('id', initial.id).select('id'));
-  const draft = await start('retest_1', ['overhead_squat', 'push_up']);
-  return { client, done: initial.id, draft: draft.id };
+  // A finished Retest 1 (better knees, a smaller gap), so Compare has two columns and a Retest 2 draft after it.
+  const retest = await start('retest_1', ['overhead_squat', 'shoulder_mobility']);
+  must(
+    await admin.from('assessment_checkpoint_results').insert([
+      { test_id: retest.test('overhead_squat'), workspace_id: ws, checkpoint_id: 'ohs.knee_valgus', side: 'L', severity: 'slight' },
+      { test_id: retest.test('overhead_squat'), workspace_id: ws, checkpoint_id: 'ohs.low_back_arch', side: 'none', severity: 'slight' },
+    ]).select('test_id'),
+  );
+  must(
+    await admin.from('assessment_measure_results').insert([
+      { test_id: retest.test('shoulder_mobility'), workspace_id: ws, measure_id: 'shm.reach_gap', side: 'L', value: 10, unit: 'cm', higher_is_better: false },
+      { test_id: retest.test('shoulder_mobility'), workspace_id: ws, measure_id: 'shm.reach_gap', side: 'R', value: 9, unit: 'cm', higher_is_better: false },
+    ]).select('test_id'),
+  );
+  must(await admin.from('assessment_tests').update({ status: 'done' }).eq('assessment_id', retest.id).select('id'));
+  must(await admin.from('assessments').update({ status: 'done', score: 90 }).eq('id', retest.id).select('id'));
+  const draft = await start('retest_2', ['overhead_squat', 'push_up']);
+  // A template, so Library › Corrective › Templates shows the list and the open template.
+  const template = must(
+    await admin.from('assessment_templates').insert({ workspace_id: ws, name: `Audit screen ${unique().slice(-5)}`, test_keys: ['overhead_squat', 'shoulder_mobility', 'push_up'] }).select('id').single(),
+  );
+  return { client, done: initial.id, draft: draft.id, cycle: cycle.id, template: template.id };
 }
 
 /** axe runs on these sizes only (the tablet adds little and costs time). */
@@ -246,6 +268,7 @@ for (const { size, use } of SIZES) {
         if (group.assessment) {
           Object.assign(ids, await seedAssessments(admin));
           cleanup.push(() => admin.auth.admin.deleteUser(ids.client!));
+          cleanup.push(() => admin.from('assessment_templates').delete().eq('id', ids.template!));
         }
         if (group.communityPost) {
           const ws = await demoWorkspace(admin);

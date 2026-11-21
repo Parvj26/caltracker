@@ -30,6 +30,7 @@ const SECTIONS = [
   { href: '/workouts', letter: 'W', name: 'Workouts', sub: 'Single sessions' },
   { href: '/exercises', letter: 'E', name: 'Exercise library', sub: 'Built-in and your own' },
   { href: '/programs', letter: 'P', name: 'Programs', sub: 'Weeks on a schedule' },
+  { href: '/corrective', letter: 'C', name: 'Corrective', sub: 'Assessment templates' },
 ] as const;
 
 /**

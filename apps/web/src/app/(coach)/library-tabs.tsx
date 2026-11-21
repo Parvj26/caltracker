@@ -6,9 +6,11 @@ const TABS = [
   { href: '/workouts', label: 'Workouts' },
   { href: '/exercises', label: 'Exercises' },
   { href: '/programs', label: 'Programs' },
+  // Movement assessments: templates now (AS11), corrective exercises with step 2 (AS8).
+  { href: '/corrective', label: 'Corrective' },
 ] as const;
 
-/** The row at the top of the Workouts, Exercises and Programs lists, to switch between them without the Library menu. */
+/** The row at the top of the Workouts, Exercises, Programs and Corrective lists, to switch between them without the Library menu. */
 export function LibraryTabs({ current }: { current: (typeof TABS)[number]['href'] }) {
   return (
     <nav aria-label="Library sections">

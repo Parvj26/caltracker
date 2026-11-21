@@ -18,8 +18,8 @@ select is(
    join pg_tables t on t.schemaname = 'public' and t.tablename = c.table_name
    where c.table_schema = 'public' and c.column_name = 'workspace_id'),
   array[
-    'assessment_checkpoint_results', 'assessment_cycles', 'assessment_measure_results', 'assessment_test_definitions',
-    'assessment_tests', 'assessments',
+    'assessment_checkpoint_results', 'assessment_cycles', 'assessment_measure_results', 'assessment_templates',
+    'assessment_test_definitions', 'assessment_tests', 'assessments',
     'award_bonus_queue', 'awards', 'body_measurements', 'body_metrics', 'client_documents', 'client_flags', 'client_goals', 'client_invite_plan_items', 'client_invites',
     'client_limitations', 'client_notes', 'client_stats', 'coach_meals', 'communities', 'community_blocks',
     'community_comments', 'community_members', 'community_notifications', 'community_post_images', 'community_posts',
@@ -288,6 +288,9 @@ insert into public.community_reports (workspace_id, community_id, reporter_id, t
 values (:'ws', :'comm', :'kay', 'post', :'vic_post', :'vic', 'Vic post', 'spam');
 insert into public.community_notifications (workspace_id, community_id, recipient_id, kind, post_id, actor_id)
 values (:'ws', :'comm', :'vic', 'comment', :'vic_post', :'kay');
+
+-- An assessment template (workspace-owned, no client).
+insert into public.assessment_templates (workspace_id, name, test_keys) values (:'ws', 'Full-body screen', array['overhead_squat', 'push_up']);
 
 -- Maya's workspace has its own things: Zed's log, a message, a post.
 select tests.create_log(:'ws2', :'zed') as zed_log \gset

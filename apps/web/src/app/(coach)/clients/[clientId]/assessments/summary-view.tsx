@@ -8,7 +8,8 @@ import {
   type FootArch,
   type MeasureDef,
 } from '@caltracker/shared';
-import { Card, PageHeader } from '@/components/ui';
+import type { ReactNode } from 'react';
+import { Button, ButtonLink, Card, PageHeader } from '@/components/ui';
 import { useLocalToday } from '@/lib/local-today';
 import type { AssessmentDetail } from './load';
 import { FindingsList, ScoreCard } from './parts';
@@ -17,11 +18,26 @@ import styles from './assessments.module.css';
 const UNIT: Record<MeasureDef['unit'], string> = { cm: ' cm', deg: '°', s: ' s' };
 const ARCH: Record<FootArch, string> = { flat: 'Flat', normal: 'Normal', high: 'High' };
 
+/** Step 2's parts of the report (step2-slots.tsx), rendered by the page on the server; each may be empty. */
+export type ReportSlots = { priorities?: ReactNode; bodyMap?: ReactNode; suggestedWorkout?: ReactNode };
+
 /**
- * A finished assessment (step 1 of AS6): the Movement score with a bar per test, what was observed, the numbers, and
- * the notes. The body map, priorities and suggested workout come in later steps.
+ * The report of a finished assessment (AS6): the Movement score with a bar per test, what was observed (L / R), the
+ * numbers, the notes, and who did it when. Prints as one clean column (Print, or the browser's own print). Step 2's
+ * priorities, body map and suggested workout go in `slots`. Sharing it with the client is step 5 (client app).
  */
-export function SummaryView({ client, assessment }: { client: { id: string; name: string }; assessment: AssessmentDetail }) {
+export function SummaryView({
+  client,
+  assessment,
+  compareHref,
+  slots = {},
+}: {
+  client: { id: string; name: string };
+  assessment: AssessmentDetail;
+  /** Compare this cycle (two or more finished). */
+  compareHref?: string | null;
+  slots?: ReportSlots;
+}) {
   const today = useLocalToday();
   const inputs = assessment.tests.map((t) => ({ definition: t.definition, status: t.entry.status, results: t.entry.results }));
   // The stored score is the one saved at the time; the bars use the same rule on the same ratings.
@@ -33,14 +49,45 @@ export function SummaryView({ client, assessment }: { client: { id: string; name
   );
   const fmt = (m: MeasureDef, v: number | undefined) => (v === undefined ? '–' : `${v}${UNIT[m.unit]}`);
   const notes = assessment.tests.filter((t) => t.entry.note || t.entry.typeDone || t.entry.discomfortLeft || t.entry.discomfortRight || Object.keys(t.entry.followUps).length > 0);
-  const title = `${SLOT_LABELS[assessment.slot]} · ${formatPlainDayMonthInYear(assessment.assessedOn, today)}`;
+  const day = formatPlainDayMonthInYear(assessment.assessedOn, today);
+  const title = `${SLOT_LABELS[assessment.slot]} · ${day}`;
+  const byline = `Cycle ${assessment.cycleNumber} · ${assessment.coachName ? `Checked by ${assessment.coachName} on ${day}` : `Checked on ${day}`}`;
 
   return (
     <div className={styles.summary} data-testid="assessment-summary">
-      <PageHeader title={title} back={{ href: `/clients/${client.id}/limitations`, label: `${client.name} · Limitations & injuries` }} subtitle={`Cycle ${assessment.cycleNumber}`} />
+      <PageHeader
+        title={title}
+        back={{ href: `/clients/${client.id}/limitations`, label: `${client.name} · Limitations & injuries` }}
+        subtitle={byline}
+        stackOnPhone
+        action={
+          <span className={styles.headerActions} data-print-hide="">
+            {compareHref ? (
+              <ButtonLink href={compareHref} variant="secondary" size="compact" phSafe>
+                Compare
+              </ButtonLink>
+            ) : null}
+            <Button variant="secondary" size="compact" onClick={() => window.print()} phSafe>
+              Print
+            </Button>
+          </span>
+        }
+      />
+      {/* Printed only: the client's name, which the screen shows in the back link (hidden on paper). */}
+      <p className={styles.printOnly}>
+        {client.name} · Movement assessment
+      </p>
       <div className={styles.summaryGrid}>
         <div className={styles.summaryCol}>
           <ScoreCard score={assessment.score ?? scores.overall} tests={scores.tests} names={names} />
+          {slots.priorities}
+          <Card className={styles.card} aria-labelledby="observed-heading">
+            <h2 id="observed-heading" className={styles.heading}>Observed</h2>
+            <FindingsList findings={findings} />
+          </Card>
+        </div>
+        <div className={styles.summaryCol}>
+          {slots.bodyMap}
           {measured.length > 0 || assessment.footArchLeft || assessment.footArchRight ? (
             <Card className={styles.card} aria-labelledby="measures-heading">
               <h2 id="measures-heading" className={styles.heading}>Measurements</h2>
@@ -79,12 +126,6 @@ export function SummaryView({ client, assessment }: { client: { id: string; name
               </table>
             </Card>
           ) : null}
-        </div>
-        <div className={styles.summaryCol}>
-          <Card className={styles.card} aria-labelledby="observed-heading">
-            <h2 id="observed-heading" className={styles.heading}>Observed</h2>
-            <FindingsList findings={findings} />
-          </Card>
           {notes.length > 0 || assessment.note ? (
             <Card className={styles.card} aria-labelledby="notes-heading">
               <h2 id="notes-heading" className={styles.heading}>Notes</h2>
@@ -113,6 +154,7 @@ export function SummaryView({ client, assessment }: { client: { id: string; name
               </ul>
             </Card>
           ) : null}
+          {slots.suggestedWorkout}
         </div>
       </div>
     </div>

@@ -101,7 +101,7 @@ test.describe('on an iPhone', () => {
     await expect(sheet(page).getByRole('link', { name: 'Meals' })).toHaveAttribute('aria-current', 'page');
   });
 
-  test('Library opens a sheet of Workouts, Exercise library and Programs; a choice navigates and lights Library', async ({ page }) => {
+  test('Library opens a sheet of Workouts, Exercise library, Programs and Corrective; a choice navigates and lights Library', async ({ page }) => {
     await signInAsCoach(page);
     await libraryTab(page).click();
     await expect(libraryTab(page)).toHaveAttribute('aria-expanded', 'true');
@@ -109,10 +109,11 @@ test.describe('on an iPhone', () => {
     const dialog = librarySheet(page);
     await expect(dialog).toBeVisible();
     const choices = dialog.getByRole('link');
-    await expect(choices).toHaveCount(3);
+    await expect(choices).toHaveCount(4);
     await expect(choices.nth(0)).toHaveAccessibleName(/^Workouts/);
     await expect(choices.nth(1)).toHaveAccessibleName(/^Exercise library/);
     await expect(choices.nth(2)).toHaveAccessibleName(/^Programs/);
+    await expect(choices.nth(3)).toHaveAccessibleName(/^Corrective/);
     await expect(choices.nth(0)).toBeFocused();
     for (const choice of await choices.all()) expect((await choice.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     // The sheet ends where the tab bar starts, and nothing is wider than the screen.
