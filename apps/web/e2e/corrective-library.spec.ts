@@ -110,7 +110,6 @@ for (const { size, use } of SIZES) {
 
       // Edit: 2 × 8 each side.
       await row.click();
-      let edit: ReturnType<Page['getByRole']>;
       if (size === 'desktop') {
         const pane = page.getByTestId('corrective-pane');
         await expect(pane.getByRole('heading', { name })).toBeVisible();
@@ -123,7 +122,7 @@ for (const { size, use } of SIZES) {
         await audit(page, size, 'dialog[open]');
         await view.getByRole('button', { name: 'Edit' }).click();
       }
-      edit = page.getByRole('dialog', { name: 'Edit corrective exercise' });
+      const edit = page.getByRole('dialog', { name: 'Edit corrective exercise' });
       await expect(edit.getByText(name)).toBeVisible();
       await edit.getByLabel('Reps (optional)').fill('8');
       await edit.getByRole('button', { name: 'Save' }).click();

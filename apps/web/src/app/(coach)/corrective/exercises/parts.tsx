@@ -7,7 +7,6 @@ import { Chip } from '@/components/ui';
 import { ChevronIcon } from '@/components/ui/chevron-icon';
 import { cx } from '@/components/ui/cx';
 import { muscleTagLabel, tagsByMuscle, type LibraryItem } from '@/lib/corrective-library';
-import { exercisePhotoUrl } from '@/lib/exercise-photos';
 import styles from './corrective.module.css';
 
 /** "↓ Under" with blue hatching, "↑ Over" with a red square: never colour alone (UI rules §2.7). */
@@ -23,11 +22,11 @@ export function DirectionTag({ direction, long = false }: { direction: Correctiv
 }
 
 /** The exercise's first photo, or a plain dumbbell mark when it has none. */
-export function Thumb({ item, size = 'row' }: { item: Pick<LibraryItem, 'imagePath' | 'name'>; size?: 'row' | 'hero' }) {
-  if (item.imagePath) {
+export function Thumb({ item, size = 'row' }: { item: Pick<LibraryItem, 'imageUrl' | 'name'>; size?: 'row' | 'hero' }) {
+  if (item.imageUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- plain img keeps the app host-agnostic (no image optimizer)
-      <img src={exercisePhotoUrl(item.imagePath)} alt="" className={size === 'row' ? styles.thumb : styles.hero} loading="lazy" />
+      <img src={item.imageUrl} alt="" className={size === 'row' ? styles.thumb : styles.hero} loading="lazy" />
     );
   }
   return (

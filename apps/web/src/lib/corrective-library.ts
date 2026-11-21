@@ -38,6 +38,8 @@ export type LibraryItem = CorrectiveChoice & {
   yours: boolean;
   /** The exercise is the coach's own (custom), so photos can be added to it. */
   custom: boolean;
+  /** Its first photo in the exercise-images bucket (the page turns it into `imageUrl`). */
+  imagePath: string | null;
 };
 
 const MUSCLE_ORDER = new Map(MUSCLE_GROUPS.map((m, i) => [m.id, i]));
@@ -66,6 +68,7 @@ export function coachItems(rows: readonly CoachCorrectiveRow[]): LibraryItem[] {
       name: r.exercise.name,
       trackingType: toTrackingType(r.exercise.tracking_type),
       imagePath: r.exercise.image_paths[0] ?? null,
+      imageUrl: null,
       direction: r.direction,
       muscles,
       dose: { sets: r.default_sets, reps: r.default_reps, seconds: r.default_seconds, eachSide: r.each_side },
@@ -102,6 +105,7 @@ export function builtinItems(exercises: readonly BuiltinExerciseRow[]): LibraryI
       name: e.name,
       trackingType: toTrackingType(e.tracking_type),
       imagePath: e.image_paths[0] ?? null,
+      imageUrl: null,
       direction: b.direction,
       muscles: b.muscles.flatMap(bothSides),
       dose: b.dose,

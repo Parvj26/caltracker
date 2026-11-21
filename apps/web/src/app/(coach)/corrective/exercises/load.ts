@@ -47,6 +47,10 @@ export async function loadCorrectiveLibrary(workspaceId: string): Promise<{ item
     muscles: byId.get(r.id) ?? [],
     exercise: r.exercises,
   }));
-  const builtins = builtinItems(builtinExercises.data);
-  return { items: mergeLibrary(coachItems(rows), builtins), builtins };
+  const withUrl = (i: LibraryItem): LibraryItem => ({
+    ...i,
+    imageUrl: i.imagePath ? supabase.storage.from('exercise-images').getPublicUrl(i.imagePath).data.publicUrl : null,
+  });
+  const builtins = builtinItems(builtinExercises.data).map(withUrl);
+  return { items: mergeLibrary(coachItems(rows).map(withUrl), builtins), builtins };
 }
