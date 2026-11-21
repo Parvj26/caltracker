@@ -5,12 +5,12 @@ Do not edit by hand: change `exercise-image-aliases.json` and re-run the script.
 
 | | Count |
 | --- | ---: |
-| Library exercises | 886 |
+| Library exercises | 891 |
 | Own pictures (free-exercise-db exercise with its own photos) | 873 |
 | Exact name match (after normalising) | 0 |
-| Alias match (hand-checked) | 3 |
-| **With a picture** | **876** |
-| **Unmatched (no picture)** | **10** |
+| Alias match (hand-checked) | 9 |
+| **With a picture** | **882** |
+| **Unmatched (no picture)** | **9** |
 
 ## Exact name matches
 
@@ -19,21 +19,26 @@ None.
 ## Alias matches
 
 - Dumbbell Walking Lunge (`caltracker:dumbbell-walking-lunge`) -> Dumbbell Lunges (`Dumbbell_Lunges`): Photos show a forward lunge holding a dumbbell at each side: standing, then both knees at 90 degrees. Each step of a walking lunge looks exactly like this.
+- Medicine Ball Russian Twist (`caltracker:medicine-ball-russian-twist`) -> Russian Twist (`Russian_Twist`): Photos show sitting leaning back with feet up, rotating a held weight from side to side. The weight is a plate rather than a medicine ball; the movement is the same.
+- Hip Thrust Machine (`caltracker:hip-thrust-machine`) -> Barbell Hip Thrust (`Barbell_Hip_Thrust`): Photos show upper back on a bench, load across the hips, driving the hips up to a flat body: the same hip thrust movement. Barbell instead of a machine.
 - Medicine Ball Sit Up & Overhead Throw (`caltracker:medicine-ball-sit-up-and-overhead-throw`) -> Supine Two-Arm Overhead Throw (`Supine_Two-Arm_Overhead_Throw`): Same exercise: lying on the back, knees bent, ball overhead, throwing it forward while sitting up.
+- Kettlebell Upright Row (`caltracker:kettlebell-upright-row`) -> Standing Dumbbell Upright Row (`Standing_Dumbbell_Upright_Row`): Photos show standing and pulling the weights up the front of the body to chest height, elbows high. Two dumbbells instead of one kettlebell; the movement is the same.
+- Kettlebell Sumo Squat (`caltracker:kettlebell-sumo-squat`) -> Plie Dumbbell Squat (`Plie_Dumbbell_Squat`): Photos show a wide-stance squat holding one weight with both hands between the legs, the same position as a kettlebell sumo squat. The weight is a dumbbell held by one end.
 - Dumbbell Romanian Deadlift (`caltracker:dumbbell-romanian-deadlift`) -> Stiff-Legged Dumbbell Deadlift (`Stiff-Legged_Dumbbell_Deadlift`): Photos show standing with dumbbells in front of the thighs, then a flat-back hip hinge with soft knees and the dumbbells at the shins: what our instructions describe.
+- Machine Assisted Pull Up (`caltracker:machine-assisted-pull-up`) -> Band Assisted Pull-Up (`Band_Assisted_Pull-Up`): Photos show an overhand pull-up from a hang to chin over the bar with assistance under the body. A band gives the assistance instead of a machine.
+- Skater Jump (`caltracker:skater-jump`) -> Lateral Bound (`Lateral_Bound`): Photos show a side-to-side bound: landing on one leg with the other leg trailing behind, the same movement as a skater jump.
 
 ## Unmatched
 
 - Kettlebell Halo (`Kettlebell_Halo`).
 - Kettlebell Halo with Overhead Extension (`Kettlebell_Halo_With_Overhead_Extension`).
-- Kettlebell Overhead Triceps Extension (`Kettlebell_Overhead_Triceps_Extension`). Looked at and turned down: Standing_Dumbbell_Triceps_Extension (Dumbbell, not a kettlebell).
-- Medicine Ball Russian Twist (`caltracker:medicine-ball-russian-twist`). Looked at and turned down: Russian_Twist (No medicine ball); Medicine_Ball_Full_Twist (Standing back to back with a partner, not seated).
+- Kettlebell Overhead Triceps Extension (`Kettlebell_Overhead_Triceps_Extension`). Looked at and turned down: Standing_Dumbbell_Triceps_Extension (Dumbbell, not a kettlebell); Overhead_Triceps (Seated partner-assisted triceps stretch on the floor, not an overhead extension with a weight).
 - Side Plank Single Leg Crunch (`caltracker:side-plank-single-leg-crunch`). Looked at and turned down: Side_Bridge (Static side plank, no knee-to-elbow crunch); Push_Up_to_Side_Plank (Push-up into a side plank; different movement).
-- Hip Thrust Machine (`caltracker:hip-thrust-machine`). Looked at and turned down: Barbell_Hip_Thrust (Barbell on a bench, not a hip thrust machine).
 - Crunch Clap (`caltracker:crunch-clap`). Looked at and turned down: Crunches (Hands behind the head, no arm swing or clap).
-- Kettlebell Upright Row (`caltracker:kettlebell-upright-row`). Looked at and turned down: Standing_Dumbbell_Upright_Row (Two dumbbells, not one kettlebell); Upright_Barbell_Row (Barbell, not a kettlebell).
-- Kettlebell Sumo Squat (`caltracker:kettlebell-sumo-squat`). Looked at and turned down: Kettlebell_Sumo_High_Pull (Pulls the kettlebell to the chin; a different exercise).
-- Machine Assisted Pull Up (`caltracker:machine-assisted-pull-up`). Looked at and turned down: Band_Assisted_Pull-Up (Band assistance, not a machine).
+- Burpee (`caltracker:burpee`).
+- Jumping Jack (`caltracker:jumping-jack`).
+- Bear Crawl (`caltracker:bear-crawl`).
+- High Knees (`caltracker:high-knees`).
 
 ## Licence
 
