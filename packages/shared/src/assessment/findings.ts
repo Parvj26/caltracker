@@ -53,7 +53,15 @@ export function observedFindings(tests: readonly FindingsInput[]): Finding[] {
   }
   // Worst first; record-only posture after the movement findings; otherwise test and checkpoint order.
   out.sort((a, b) => Number(a.recordOnly) - Number(b.recordOnly) || Number(b.worst === 'severe') - Number(a.worst === 'severe') || a.order - b.order);
-  return out.map(({ order: _order, ...f }) => f);
+  return out.map((f) => ({
+    checkpointId: f.checkpointId,
+    label: f.label,
+    testKey: f.testKey,
+    testName: f.testName,
+    recordOnly: f.recordOnly,
+    sides: f.sides,
+    worst: f.worst,
+  }));
 }
 
 export type FindingChip = { text: string; severity: Exclude<Severity, 'normal'> };
