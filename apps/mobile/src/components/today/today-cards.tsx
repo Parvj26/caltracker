@@ -66,8 +66,8 @@ const STICKER = 48;
 const TILE_GAP = 6;
 
 
-/** The coach chat: the Coach tab's first screen. */
-export const COACH_CHAT_HREF = '/coach';
+/** The coach chat, with the Coach screen underneath it (Back lands on the coach's profile). */
+export const COACH_CHAT_HREF = '/coach/chat';
 /** The add-meal sheet. */
 const ADD_MEAL_HREF = '/food/add';
 

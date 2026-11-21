@@ -1,5 +1,5 @@
-# Chat with the coach: the coach writes, the client opens the Coach tab, which is the chat (the unread badge shows,
-# then clears once the chat is open), sees the message and the quick replies, replies (the quick replies hide), and the
+# Chat with the coach: the coach writes, the client opens the Coach tab (the coach's profile) and taps Message (the
+# unread badge shows, then clears once the chat is open), sees the message and the quick replies, replies (the quick replies hide), and the
 # reply appears with a time (not "Sending…"). The coach's next message brings the quick replies back. The helper confirms the server
 # stored the reply once and that the coach's message was marked read.
 # Run via `pnpm --filter mobile e2e` (starts the helper bridge and passes HELPER_URL).
@@ -26,11 +26,13 @@ env:
     visible:
       id: coach-name
     timeout: 20000
+- tapOn:
+    id: coach-open-chat
 - extendedWaitUntil:
     visible: 'Hi from your coach, ready for Monday?'
     timeout: 20000
 - assertVisible:
-    id: coach-strip-meals
+    id: coach-chat-name
 - assertVisible: 'Today'
 # The approved quick replies sit above the composer.
 - assertVisible: 'Done for today'
@@ -51,7 +53,7 @@ env:
 - runScript:
     file: helpers/call.js
     env: { ACTION: assert-reply, EMAIL: '${EMAIL}', NAME: 'Yes, see you Monday' }
-# The coach's message was read when the tab opened, so the badge is gone.
+# The coach's message was read when the chat opened, so the badge is gone.
 - runScript:
     file: helpers/call.js
     env: { ACTION: assert-read, EMAIL: '${EMAIL}' }
@@ -63,16 +65,12 @@ env:
     visible: 'Great, bring water'
     timeout: 20000
 - assertVisible: 'Done for today'
-# The header opens the coach's profile; back returns to the chat.
-- tapOn:
-    id: coach-header
-- assertVisible:
-    id: coach-about-back
-- tapOn:
-    id: coach-about-back
-- assertVisible:
-    id: coach-composer-input
 - takeScreenshot: messages-phone
+# Back from the chat lands on the coach's profile.
+- tapOn:
+    id: coach-chat-back
+- assertVisible:
+    id: coach-open-chat
 - runScript:
     file: helpers/call.js
     env: { ACTION: cleanup-messages, EMAIL: '${EMAIL}' }
