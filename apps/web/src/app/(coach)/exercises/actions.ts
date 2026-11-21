@@ -14,6 +14,7 @@ import {
 import { fail, type ActionFailure } from '@/lib/action-result';
 import { requireCoach } from '@/lib/auth';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { MAX_EXERCISE_PHOTOS, isExercisePhotoPath } from '@/lib/corrective-library';
 
 export type SaveOverrideOutcome = { ok: true } | ActionFailure;
 
@@ -175,4 +176,59 @@ export async function quickCreateExercise(input: { name: string; trackingType: s
   if (error || !data) return fail('exercise_create_failed', 'action:exercises.quickCreateExercise');
   revalidatePath('/exercises');
   return { ok: true, id: data.id, name, trackingType: v.trackingType };
+}
+
+/**
+ * Sets the photos of one of the coach's own exercises (start and end, up to 2) after the browser uploaded them, and
+ * deletes the files of photos taken out. Every path is checked here, on the server: it must be this workspace's folder
+ * for this exercise (custom/<workspace>/<exercise>/<uuid>.webp|jpg) and the file must be there.
+ */
+export async function setExercisePhotos(exerciseId: string, paths: string[]): Promise<{ ok: true } | ActionFailure> {
+  const where = 'action:exercises.setExercisePhotos';
+  const { workspaceId } = await requireCoach();
+  const idCheck = ExerciseOverrideInput.shape.exerciseId.safeParse(exerciseId);
+  if (!idCheck.success || !Array.isArray(paths)) return fail('request_invalid', where);
+  if (paths.length > MAX_EXERCISE_PHOTOS) return fail('exercise_photo_limit', where);
+  if (new Set(paths).size !== paths.length || !paths.every((p) => typeof p === 'string' && isExercisePhotoPath(p, workspaceId, idCheck.data))) {
+    return fail('request_invalid', where);
+  }
+
+  const supabase = await createServerSupabase();
+  const current = await supabase
+    .from('exercises')
+    .select('image_paths')
+    .eq('id', idCheck.data)
+    .eq('workspace_id', workspaceId)
+    .eq('source', 'custom')
+    .maybeSingle();
+  if (current.error) return fail('exercise_photo_failed', where);
+  if (!current.data) return fail('exercise_not_found', where);
+
+  const before = current.data.image_paths;
+  const folder = `custom/${workspaceId}/${idCheck.data}`;
+  const added = paths.filter((p) => !before.includes(p));
+  if (added.length > 0) {
+    const listed = await supabase.storage.from('exercise-images').list(folder, { limit: 100 });
+    if (listed.error) return fail('exercise_photo_failed', where);
+    const there = new Set(listed.data.map((f) => `${folder}/${f.name}`));
+    if (!added.every((p) => there.has(p))) return fail('exercise_photo_failed', where);
+  }
+
+  const { data, error } = await supabase
+    .from('exercises')
+    .update({ image_paths: paths })
+    .eq('id', idCheck.data)
+    .eq('workspace_id', workspaceId)
+    .eq('source', 'custom')
+    .select('id');
+  if (error || data.length === 0) return fail('exercise_photo_failed', where);
+
+  // Files of photos taken out (only ever this exercise's own folder). Best effort: the photo is already off the page.
+  const removed = before.filter((p) => !paths.includes(p) && isExercisePhotoPath(p, workspaceId, idCheck.data));
+  if (removed.length > 0) await supabase.storage.from('exercise-images').remove(removed);
+
+  revalidatePath('/exercises');
+  revalidatePath(`/exercises/${idCheck.data}`);
+  revalidatePath('/corrective/exercises');
+  return { ok: true };
 }
