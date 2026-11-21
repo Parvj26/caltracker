@@ -147,7 +147,7 @@ const okInt = (v: unknown, lo: number, hi: number) => typeof v === 'number' && N
 
 /**
  * The form's direction, muscles (each a catalogue muscle on a side it has, at least one, no repeats) and dose (1–20
- * sets; reps or seconds or neither, never both), checked; null when anything is off. The database checks again.
+ * sets; reps or seconds, exactly one), checked; null when anything is off. The database checks again.
  */
 export function checkCorrectiveTags(input: unknown): CorrectiveTagsInput | null {
   if (typeof input !== 'object' || input === null) return null;
@@ -171,6 +171,7 @@ export function checkCorrectiveTags(input: unknown): CorrectiveTagsInput | null 
   if (!okInt(d.sets, 1, DOSE_LIMITS.sets) || typeof d.eachSide !== 'boolean') return null;
   const reps = d.reps === null ? null : okInt(d.reps, 1, DOSE_LIMITS.reps) ? (d.reps as number) : undefined;
   const seconds = d.seconds === null ? null : okInt(d.seconds, 1, DOSE_LIMITS.seconds) ? (d.seconds as number) : undefined;
-  if (reps === undefined || seconds === undefined || (reps !== null && seconds !== null)) return null;
+  // Exactly one of reps or seconds: a dose of just "2 sets" tells the client nothing to do.
+  if (reps === undefined || seconds === undefined || (reps === null) === (seconds === null)) return null;
   return { direction: i.direction, muscles, dose: { sets: d.sets as number, reps, seconds, eachSide: d.eachSide } };
 }

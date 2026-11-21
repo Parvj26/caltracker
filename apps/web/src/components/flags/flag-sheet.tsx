@@ -8,8 +8,8 @@ import {
   FLAG_TYPES,
   FLAG_TYPE_LABELS,
   MUSCLE_GROUPS,
-  bodyRegion,
   defaultFlagSide,
+  flagPlace,
   flagSidesFor,
   isBodyRegionId,
   regionOnView,
@@ -90,7 +90,8 @@ export function FlagSheet({
       try {
         const outcome = await addFlag(clientId, input, today);
         if (!outcome.ok) return setSaveError(outcome.code);
-        const place = regionId ? (bodyRegion(regionId)?.name ?? 'Flag') : 'General';
+        // "Left knee flagged.", "Both knees flagged.", "Neck flagged."
+        const place = flagPlace({ region: regionId, side });
         await ref.current?.close();
         onSaved(place);
       } catch (e) {
