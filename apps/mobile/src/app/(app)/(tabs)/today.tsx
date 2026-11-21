@@ -197,8 +197,6 @@ export default function Today() {
     welcomeGate.todayReady();
   }, []);
 
-  // The welcome waits for Today only while Today is there to load.
-  useEffect(() => welcomeGate.mountToday(), []);
 
   // A fresh open after more than 10 minutes away: read Today again (the day may have changed), under the welcome.
   const { opens } = useWelcomeState();
@@ -237,6 +235,14 @@ export default function Today() {
 
 
   const inProgress = active?.status === 'in_progress' ? active : null;
+  // The welcome after a long time away shows only onto Today in view with no workout going (never mid-task).
+  const going = inProgress !== null;
+  useFocusEffect(
+    useCallback(() => {
+      welcomeGate.reportToday(true, going);
+      return () => welcomeGate.reportToday(false, going);
+    }, [going]),
+  );
   // "6 of 19 sets · next: A1 Romanian Deadlift" on the card of the workout going (the shared set-count rule).
   const progress = useMemo<WorkoutProgress | null>(() => {
     if (!inProgress) return null;

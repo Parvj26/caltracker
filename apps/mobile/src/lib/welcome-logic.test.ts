@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { COLD_START, WELCOME_AFTER_BACKGROUND_MS, welcomeOnResume, welcomeStep, welcomeText, type WelcomeState } from './welcome-logic';
+import { COLD_START, WELCOME_AFTER_BACKGROUND_MS, welcomeAgain, welcomeOnResume, welcomeStep, welcomeText, type WelcomeState } from './welcome-logic';
 
 const MIN = 60 * 1000;
 const hidden: WelcomeState = { showing: false, opens: 0 };
-const resume = (awayMs: number | null, todayMounted = true) =>
-  ({ type: 'resume', backgroundedAt: awayMs === null ? null : 1_000_000, now: 1_000_000 + (awayMs ?? 0), todayMounted }) as const;
+const resume = (awayMs: number | null, onToday = true, workoutInProgress = false) =>
+  ({ type: 'resume', backgroundedAt: awayMs === null ? null : 1_000_000, now: 1_000_000 + (awayMs ?? 0), onToday, workoutInProgress }) as const;
 
 describe('welcome: when it shows', () => {
   it('shows on a cold start, from the first frame', () => {
@@ -31,6 +31,25 @@ describe('welcome: when it shows', () => {
 
   it('not on a resume when there is no Today to wait for (signed out, no coach)', () => {
     expect(welcomeStep(hidden, resume(30 * MIN, false))).toBe(hidden);
+  });
+
+  it('never covers another screen: back onto the logger, a preview or another tab just resumes', () => {
+    expect(welcomeAgain(resume(30 * MIN, false))).toBe(false);
+    expect(welcomeStep(hidden, resume(30 * MIN, false))).toBe(hidden);
+  });
+
+  it('never while a workout is in progress, even on Today', () => {
+    expect(welcomeAgain(resume(30 * MIN, true, true))).toBe(false);
+    expect(welcomeStep(hidden, resume(30 * MIN, true, true))).toBe(hidden);
+  });
+
+  it('only onto Today, with no workout going, after more than 10 minutes', () => {
+    expect(welcomeAgain(resume(10 * MIN + 1, true, false))).toBe(true);
+    expect(welcomeAgain(resume(10 * MIN, true, false))).toBe(false);
+  });
+
+  it('a cold start is unchanged: it shows whatever was open before (the app starts on Today)', () => {
+    expect(COLD_START).toEqual({ showing: true, opens: 0 });
   });
 
   it('a resume while already showing changes nothing', () => {

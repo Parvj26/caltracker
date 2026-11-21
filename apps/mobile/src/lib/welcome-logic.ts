@@ -19,6 +19,14 @@ export function welcomeOnResume(backgroundedAt: number | null, now: number): boo
   return backgroundedAt !== null && now - backgroundedAt > WELCOME_AFTER_BACKGROUND_MS;
 }
 
+/**
+ * Coming back after a long time away shows the welcome only onto the Today tab with no workout going. It never covers
+ * the workout logger or any other screen mid-task: there the app just resumes where the client was.
+ */
+export function welcomeAgain(r: { backgroundedAt: number | null; now: number; onToday: boolean; workoutInProgress: boolean }): boolean {
+  return r.onToday && !r.workoutInProgress && welcomeOnResume(r.backgroundedAt, r.now);
+}
+
 export type WelcomeState = {
   showing: boolean;
   /** Counts fresh opens after a long time away: Today reads itself again on each, and the welcome waits for that. */
@@ -26,8 +34,11 @@ export type WelcomeState = {
 };
 
 export type WelcomeEvent =
-  /** Back to the front. Today is mounted only when signed in with a coach: otherwise there is nothing to wait for. */
-  | { type: 'resume'; backgroundedAt: number | null; now: number; todayMounted: boolean }
+  /**
+   * Back to the front. `onToday`: the Today tab is the screen in view (nothing pushed over it; only when signed in
+   * with a coach). `workoutInProgress`: a workout is being logged on this phone.
+   */
+  | { type: 'resume'; backgroundedAt: number | null; now: number; onToday: boolean; workoutInProgress: boolean }
   /** Today's load finished (shown, or its error shown). */
   | { type: 'ready' }
   /** Signed out or without a coach: Today never loads. */
@@ -41,7 +52,7 @@ export const COLD_START: WelcomeState = { showing: true, opens: 0 };
 export function welcomeStep(state: WelcomeState, event: WelcomeEvent): WelcomeState {
   switch (event.type) {
     case 'resume':
-      if (state.showing || !event.todayMounted || !welcomeOnResume(event.backgroundedAt, event.now)) return state;
+      if (state.showing || !welcomeAgain(event)) return state;
       return { showing: true, opens: state.opens + 1 };
     case 'ready':
     case 'no-today':

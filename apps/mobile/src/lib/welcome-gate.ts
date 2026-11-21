@@ -4,7 +4,8 @@ import { useSyncExternalStore } from 'react';
 import { COLD_START, welcomeStep, type WelcomeEvent, type WelcomeState } from './welcome-logic';
 
 let state: WelcomeState = COLD_START;
-let todayMounted = 0;
+/** What Today last reported: in view (focused, nothing over it) and whether a workout is going. */
+let today = { focused: false, workoutInProgress: false };
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void): () => void {
@@ -22,18 +23,16 @@ function send(event: WelcomeEvent): void {
 }
 
 export const welcomeGate = {
-  /** Back to the front: shows the welcome again after more than 10 minutes away (when Today is there to load). */
-  resumed: (backgroundedAt: number | null, now: number) => send({ type: 'resume', backgroundedAt, now, todayMounted: todayMounted > 0 }),
+  /** Back to the front: shows the welcome again after more than 10 minutes away, only onto Today with no workout going. */
+  resumed: (backgroundedAt: number | null, now: number) =>
+    send({ type: 'resume', backgroundedAt, now, onToday: today.focused, workoutInProgress: today.workoutInProgress }),
   /** Today's load is done: the welcome fades into it. */
   todayReady: () => send({ type: 'ready' }),
   noToday: () => send({ type: 'no-today' }),
   timedOut: () => send({ type: 'timeout' }),
-  /** Today is on screen (in the tabs); returns its unmount. */
-  mountToday: (): (() => void) => {
-    todayMounted += 1;
-    return () => {
-      todayMounted -= 1;
-    };
+  /** Today says whether it is the screen in view and whether a workout is in progress. */
+  reportToday: (focused: boolean, workoutInProgress: boolean) => {
+    today = { focused, workoutInProgress };
   },
 };
 
