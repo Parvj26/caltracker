@@ -6,11 +6,8 @@ import { flagReminderText, formatPlainDayMonth, type ClientFlag } from '@caltrac
 import { openFlagsFor } from '@/app/(coach)/clients/[clientId]/flags-actions';
 import styles from './flags.module.css';
 
-/**
- * Where the reminder bar opens: the client's flags. Points at the Overview card until the Limitations & injuries tab
- * ships (then change it here only).
- */
-export const flagsHref = (clientId: string) => `/clients/${clientId}#limitations`;
+/** Where the reminder bar opens: the client's Limitations & injuries tab (board AS10). */
+export const flagsHref = (clientId: string) => `/clients/${clientId}/limitations`;
 
 /**
  * The builder's slim amber reminder (board AS10): "Vaishali: Neck pain (20 Nov) · Left knee: no deep squats", open

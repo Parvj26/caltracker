@@ -152,12 +152,13 @@
 }
 .tabsArrowBefore { left: 0; }
 .tabsArrowAfter { right: 0; }
-/* iPhone: five tabs nearly fit, so no arrows; the strip is swiped, and its faded edge shows there is more. */
+/* iPhone: the tabs nearly fit, so no arrows; the strip is swiped, and its faded edge shows there is more. */
 @media (max-width: 599.98px) {
   .tabsArrow { display: none; }
-  .tabs { margin-right: calc(-1 * var(--ct-space-2)); scrollbar-width: none; }
+  /* position: the hidden "Documents" text is placed inside the strip, so it never widens the page (six tabs scroll). */
+  .tabs { position: relative; margin-right: calc(-1 * var(--ct-space-2)); scrollbar-width: none; }
   .tabs::-webkit-scrollbar { display: none; }
-  /* All five tabs fit at 375 px: tighter padding and "Docs" (its full name stays for screen readers). */
+  /* Tighter padding and "Docs" (its full name stays for screen readers). */
   .tabs .tabList { gap: 0; }
   .tabList .tab { justify-content: center; min-width: var(--ct-tap-min); padding: 0 var(--ct-space-2); }
   .tabLong { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

@@ -12,6 +12,7 @@ import {
   addChoice,
   addChoiceOption,
   addSection,
+  addRound,
   addSet,
   addStraightBlocks,
   blockBadges,
@@ -429,6 +430,7 @@ export function WorkoutBuilder({
         ),
       })),
     onAddSet: (exId) => change((d) => addSet(d, blockId, exId, makeId)),
+    onAddRound: () => change((d) => addRound(d, blockId, makeId)),
     onRemoveSet: (exId, setId) => change((d) => removeSet(d, blockId, exId, setId)),
     onUpdateSet: (exId, setId, patch) => change((d) => updateSet(d, blockId, exId, setId, patch)),
     onToggleMeasurement: (exId, m) => change((d) => toggleExerciseMeasurement(d, blockId, exId, m)),
@@ -554,13 +556,11 @@ export function WorkoutBuilder({
   const sectionsFull = doc.sections.length >= 10;
   const addSectionNamed = (name: string) => change((d) => addSection(d, name, makeId));
 
-  // An empty workout: one line and the create button, in the list itself (rulebook §11.2).
+  // An empty workout: one line in the list itself. "+ Exercise" is always in view (the top bar, or the bottom bar on a
+  // phone), so the empty list doesn't repeat it.
   const emptyState = (
     <div className={styles.emptyState}>
       <p className={styles.caption}>No exercises yet.</p>
-      <Button variant="create" disabled={full} onClick={() => setPicker({ kind: 'straight' })} data-ph-capture-attribute-label="workout_add_exercises_empty" phSafe>
-        + Add exercises
-      </Button>
     </div>
   );
 

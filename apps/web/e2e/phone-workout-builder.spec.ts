@@ -159,7 +159,11 @@ test('a row opens its exercise: − / + edit a set, + Set copies it, ↑ goes to
   const ed = editor(page, last);
   await expect(ed.getByText('Exercise 8 of 8')).toBeVisible();
   const set2 = ed.getByRole('group', { name: `${last} set 2`, exact: true });
+  // − / + show for the box being typed in (in the × spot), and never take focus from it.
+  await set2.getByLabel('Weight (kg)').click();
   await set2.getByRole('button', { name: 'More weight' }).click();
+  await expect(set2.getByLabel('Weight (kg)')).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(set2.getByLabel('Weight (kg)')).toHaveValue('22.5');
   // 16 px or more, so Safari doesn't zoom in.
   expect(parseFloat(await set2.getByLabel('Weight (kg)').evaluate((el) => getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);

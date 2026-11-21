@@ -96,7 +96,8 @@ test('set types, + Set copies the last set, × removes a set, and no per-set not
   await pickSetType(set3, 'Drop set');
   await set3.getByLabel('Weight (kg)').fill('40');
   await expect(set3.getByLabel(/^Rest/)).toHaveCount(0);
-  const indent = async (row: typeof set1) => (await row.boundingBox())!.x;
+  // The drop's number is indented; its boxes stay on the columns.
+  const indent = async (row: typeof set1) => row.locator(':scope > span').first().evaluate((el) => el.getBoundingClientRect().x + parseFloat(getComputedStyle(el).paddingLeft));
   expect(await indent(set3)).toBeGreaterThan(await indent(set1));
 
   // + Set copies the last set: a drop at 40 kg x 8.

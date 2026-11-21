@@ -121,11 +121,13 @@ for (const { size, use } of SIZES) {
       await shot(page, `${size}-4-new-workout-sheet`);
       await audit(page, size, 'dialog[open]');
 
-      // A tap on the reminder opens her flags.
+      // A tap on the reminder opens her Limitations & injuries tab, with the same flags card (board AS1).
       await page.goto(`/clients/${clientId}/workouts/${workout.data.id}`);
       await page.getByTestId('flag-reminder').click();
-      await expect(page).toHaveURL(new RegExp(`/clients/${clientId}#limitations$`));
-      await expect(card).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`/clients/${clientId}/limitations$`));
+      await expect(card.getByRole('list', { name: 'Open flags, newest first' }).getByRole('listitem')).toHaveCount(2);
+      await shot(page, `${size}-6-limitations-tab`, true);
+      await page.goto(`/clients/${clientId}`);
 
       // Resolve the neck: it moves under "Resolved (1)" and drops off the chip and the reminder.
       await card.getByRole('button', { name: 'Resolve Neck pain' }).click();
