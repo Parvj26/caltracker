@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 
 /** Phones and iPad portrait, where the save bar sits at the top (see builder.module.css). Not a desktop window. */
 const TOUCH_TOP_BAR = '(max-width: 899.98px) and (pointer: coarse)';
@@ -86,3 +86,34 @@ export function useSheetKeyboardInset(ref: RefObject<HTMLElement | null>) {
     };
   }, [ref]);
 }
+
+/**
+ * True while an on-screen keyboard is open (the visible part of the page is much shorter than the window): the phone
+ * exercise editor hides its "+ Set / Done" bar then, so the set rows keep the room. Always false without a
+ * visualViewport (and on a desktop, where no keyboard covers the page).
+ */
+export function useKeyboardOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    let frame = 0;
+    const apply = () => {
+      frame = 0;
+      setOpen(window.innerHeight - viewport.height > KEYBOARD_MIN_PX);
+    };
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(apply);
+    };
+    apply();
+    viewport.addEventListener('resize', schedule);
+    return () => {
+      viewport.removeEventListener('resize', schedule);
+      if (frame !== 0) cancelAnimationFrame(frame);
+    };
+  }, []);
+  return open;
+}
+
+/** How much of the window must be covered before it counts as a keyboard (not Safari's bars coming and going). */
+const KEYBOARD_MIN_PX = 150;

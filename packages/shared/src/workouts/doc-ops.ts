@@ -343,8 +343,17 @@ export function addSet(doc: WorkoutDoc, blockId: string, workoutExerciseId: stri
         : (lastNonDrop(b.exercises[b.exercises.length - 1]!.sets)?.restSeconds ?? DEFAULT_REST);
     }
     const added = { ...e, sets: [...e.sets, copyOfLast(makeId, e.sets, rest)] };
-    return { ...b, exercises: b.exercises.map((x, xi) => (xi === i ? added : x)) };
+    const next = { ...b, exercises: b.exercises.map((x, xi) => (xi === i ? added : x)) };
+    // An earlier exercise whose set in this round was the round's last now goes straight on to this one: its rest,
+    // no longer shown, is zeroed so the client doesn't rest on it (uneven supersets).
+    return b.kind === 'superset' ? { ...next, exercises: next.exercises.map((x, xi) => (xi < i ? withRest(x, coveredRest(next, xi)) : x)) } : next;
   });
+}
+
+/** False when a superset's "+ Set" can't add a round: an exercise (or a substitute) already has MAX_SETS sets. */
+export function canAddRound(b: WorkoutBlockDoc): boolean {
+  const full = (sets: readonly WorkoutSetDoc[]) => sets.length >= MAX_SETS;
+  return b.kind === 'superset' && !b.exercises.some((e) => full(e.sets) || e.substitutes.some((x) => full(x.sets)));
 }
 
 export function addRound(doc: WorkoutDoc, blockId: string, makeId: () => string): WorkoutDoc {
@@ -353,11 +362,13 @@ export function addRound(doc: WorkoutDoc, blockId: string, makeId: () => string)
     const full = (sets: readonly WorkoutSetDoc[]) => sets.length >= MAX_SETS;
     if (b.kind !== 'superset' || b.exercises.some((e) => full(e.sets) || e.substitutes.some((x) => full(x.sets)))) return b;
     const last = b.exercises.length - 1;
+    // Each exercise copies its own last working set (type and to-failure included; drops are skipped), like "+ Set".
     const grow = (sets: WorkoutSetDoc[], i: number): WorkoutSetDoc[] => {
       const from = lastNonDrop(sets);
-      return [...sets, newSet(makeId, i === last ? (from?.restSeconds ?? DEFAULT_REST) : 0, from)];
+      const rest = i === last ? (from?.restSeconds ?? DEFAULT_REST) : 0;
+      return [...sets, from ? fitKind({ ...from, id: makeId(), note: null, restSeconds: rest }) : newSet(makeId, rest)];
     };
-    return {
+    const grown = {
       ...b,
       exercises: b.exercises.map((e, i) => ({
         ...e,
@@ -365,6 +376,8 @@ export function addRound(doc: WorkoutDoc, blockId: string, makeId: () => string)
         substitutes: e.substitutes.map((sub) => ({ ...sub, sets: grow(sub.sets, i) })),
       })),
     };
+    // Uneven supersets: a set that was its round's last and now goes straight on to a later exercise rests 0.
+    return { ...grown, exercises: grown.exercises.map((e, i) => withRest(e, coveredRest(grown, i))) };
   });
 }
 

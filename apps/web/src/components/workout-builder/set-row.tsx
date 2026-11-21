@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode } from 'react';
 import {
   setKindOf,
   setKindPatch,
@@ -130,18 +130,28 @@ export function NumberInput({ label, value, format, parse, onCommit, resetKey = 
  * The Rest box, with quick picks (0:30, 1:00, 1:30, 2:00) while it has focus. A pick fills the box in one tap; the
  * one that matches is black. Pressing a pick never takes focus from the box (pointerdown's default is prevented),
  * so typing carries on and the keyboard stays up. On a phone the picks sit under the box and are scrolled above the
- * keyboard; on iPad and desktop they drop down under it.
+ * keyboard; they drop down under the box, over the rows below, so the row keeps its height.
  */
-function RestInput({ value, onCommit, stacked }: { value: number | null; onCommit: (n: number | null) => void; stacked: boolean }) {
+function RestInput({
+  value,
+  onCommit,
+  onFocus,
+  onBlur,
+}: {
+  value: number | null;
+  onCommit: (n: number | null) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+}) {
   const [focused, setFocused] = useState(false);
   // Bumps on each pick, so the box shows the picked value even while it holds a typed draft.
   const [round, setRound] = useState(0);
   const picksRef = useRef<HTMLDivElement>(null);
   const shown = restPicksShown({ focused, hasRestBox: true });
   const active = activeRestPick(value);
-  // Phone: keep the picks in view above the on-screen keyboard (the sheet shrinks to the visible part as it opens).
+  // Touch screens: keep the picks in view above the on-screen keyboard (the sheet shrinks to the visible part as it opens).
   useEffect(() => {
-    if (!shown || !stacked) return;
+    if (!shown || !window.matchMedia('(pointer: coarse)').matches) return;
     const viewport = window.visualViewport;
     const reveal = () => picksRef.current?.scrollIntoView({ block: 'nearest' });
     const timer = setTimeout(reveal, 250);
@@ -150,9 +160,9 @@ function RestInput({ value, onCommit, stacked }: { value: number | null; onCommi
       clearTimeout(timer);
       viewport?.removeEventListener('resize', reveal);
     };
-  }, [shown, stacked]);
+  }, [shown]);
   return (
-    <span className={styles.restWrap} data-stacked={stacked || undefined}>
+    <span className={styles.restWrap}>
       <NumberInput
         resetKey={round}
         label="Rest (m:ss)"
@@ -163,8 +173,14 @@ function RestInput({ value, onCommit, stacked }: { value: number | null; onCommi
         format={formatClock}
         parse={parseClock}
         onCommit={onCommit}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onFocus={() => {
+          setFocused(true);
+          onFocus?.();
+        }}
+        onBlur={() => {
+          setFocused(false);
+          onBlur?.();
+        }}
       />
       {shown ? (
         <div ref={picksRef} role="group" aria-label="Quick rest" className={styles.restPicks}>
@@ -209,50 +225,66 @@ type Props = {
   errors: string[];
   onChange: (patch: SetPatch) => void;
   onRemove: () => void;
-  /** The phone exercise editor: "Set N", its type and × on top, then one labelled line per box. */
-  stacked?: boolean;
+  /** A phone: smaller boxes (the column names say "Wt" at three measures). */
+  compact?: boolean;
+  /** The exercise has a Rest column (some set has a rest box): a row without one keeps the empty cell. */
+  restColumn?: boolean;
 };
 
-/**
- * − and + on either side of a box (phones, iPads and other touch screens; hidden on a desktop with a mouse). Typing
- * still works; each tap changes the doc at once. 44 px tall, spaced apart.
- */
-function Stepper({ less, more, onStep, children }: { less: string; more: string; onStep: (dir: 1 | -1) => void; children: ReactNode }) {
+/** Which box of a row has focus: the tray at the row's end shows its − / + (reps, weight) on touch screens. */
+type Focused = 'reps' | 'weight' | 'duration' | 'distance' | 'rest' | null;
+
+/** One box in a set row, on the columns the header names (SetTable). */
+function Cell({ col, children }: { col: string; children: ReactNode }) {
   return (
-    <span className={styles.stepper}>
-      <button type="button" className={styles.stepButton} aria-label={less} onClick={() => onStep(-1)} data-ph-capture-attribute-label="workout_step_down">
-        <span aria-hidden="true">−</span>
-      </button>
+    <span className={styles.setCell} data-col={col}>
       {children}
-      <button type="button" className={styles.stepButton} aria-label={more} onClick={() => onStep(1)} data-ph-capture-attribute-label="workout_step_up">
-        <span aria-hidden="true">+</span>
-      </button>
     </span>
   );
 }
 
-/** One labelled box in a set row: a small caption above it, as in the approved mockup. */
-function Field({ caption, col, children }: { caption: string; col: string; children: ReactNode }) {
-  return (
-    <div className={styles.field} data-col={col}>
-      <span className={styles.fieldCaption} aria-hidden="true">
-        {caption}
-      </span>
-      <span className={styles.fieldBox}>{children}</span>
-    </div>
-  );
-}
-
 /**
- * One set (see SetTable for the two layouts): its number, its type letter (W / N / F / D, see SetTypeMenu), one rep count (or weight, time or distance,
- * as the exercise's tracking type needs) and rest. A drop is indented under the set above and has no rest of its own.
- * The × in the corner removes it.
+ * One set as one slim row (SetTable puts the column names above, once): its number, its type letter (W / N / F / D,
+ * see SetTypeMenu), one box per target the exercise tracks (reps, weight, time, distance) and rest, then a fixed slot
+ * at the end. The slot holds × (remove the set); on touch screens, while the reps or weight box has focus, it holds
+ * that box's − and + instead, so the row never changes height. Pressing − / + never takes focus from the box
+ * (pointerdown's default is prevented), so the keyboard stays up. A desktop with a mouse has no − / +. A drop is
+ * indented and has no rest of its own.
  */
-export function SetRow({ set, number, name, trackingType, units, showRest, canRemove, canDrop, errors, onChange, onRemove, stacked = false }: Props) {
+export function SetRow({ set, number, name, trackingType, units, showRest, canRemove, canDrop, errors, onChange, onRemove, compact = false, restColumn = showRest }: Props) {
   const fields = targetFieldsFor(trackingType);
   const kind = setKindOf(set);
   const isDrop = set.setType === 'drop';
   const distanceUnit = distanceUnitFor(units);
+  const [focused, setFocused] = useState<Focused>(null);
+  // Bumps on each − / +, so the box shows the stepped value even while it holds a typed draft.
+  const [stepped, setStepped] = useState(0);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const focusOn = (f: Focused) => {
+    setFocused(f);
+    // Keep the row in view below the column names (and above the keyboard).
+    requestAnimationFrame(() => rowRef.current?.scrollIntoView({ block: 'nearest' }));
+  };
+  const blur = () => setFocused(null);
+  const reps = singleReps(set.targetRepsMin, set.targetRepsMax);
+  const stepField = (field: Focused, dir: 1 | -1) => {
+    if (field === 'reps') {
+      const n = stepReps(reps, dir);
+      onChange({ targetRepsMin: n, targetRepsMax: n });
+    } else if (field === 'weight') {
+      onChange({ targetWeightKg: stepWeight(set.targetWeightKg, dir, units) });
+    } else return;
+    setStepped((k) => k + 1);
+  };
+  const step = (dir: 1 | -1) => stepField(focused, dir);
+  /** ↑ / ↓ in the reps or weight box step it like + / − (the keyboard's way to them, on every size). */
+  const arrows = (field: Focused, e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    stepField(field, e.key === 'ArrowUp' ? 1 : -1);
+  };
+  const stepping = focused === 'reps' || focused === 'weight';
+  const keep = (e: { preventDefault: () => void }) => e.preventDefault();
   const removeButton = (
     <button
       type="button"
@@ -270,119 +302,130 @@ export function SetRow({ set, number, name, trackingType, units, showRest, canRe
 
   return (
     <div
+      ref={rowRef}
       role="group"
       aria-label={name}
       className={cx(styles.setRow, isDrop && styles.dropRow)}
-      data-layout={stacked ? 'stacked' : undefined}
+      data-focus={focused ?? undefined}
+      data-compact={compact || undefined}
     >
-      {stacked ? (
-        <div className={styles.setHead}>
-          <span className={styles.setHeadName} aria-hidden="true">Set {number}</span>
-          {typeMenu}
-          {removeButton}
-        </div>
+      <span className={styles.setLabel} aria-hidden="true">
+        {number}
+      </span>
+      <Cell col="type">{typeMenu}</Cell>
+
+      {fields.includes('reps') ? (
+        <Cell col="reps">
+          <NumberInput
+            label="Reps"
+            inputMode="numeric"
+            placeholder={set.toFailure ? 'max' : 'reps'}
+            className={styles.narrow}
+            value={reps}
+            format={String}
+            parse={parseWhole}
+            resetKey={focused === 'reps' ? stepped : 0}
+            onFocus={() => focusOn('reps')}
+            onKeyDown={(e) => arrows('reps', e)}
+            onBlur={blur}
+            onCommit={(n) => onChange({ targetRepsMin: n, targetRepsMax: n })}
+          />
+        </Cell>
       ) : null}
-      <div className={styles.setCells}>
-        {!stacked ? (
+
+      {fields.includes('weight') ? (
+        <Cell col="weight">
+          <NumberInput
+            label={`Weight (${units})`}
+            inputMode="decimal"
+            placeholder={units}
+            className={styles.narrow}
+            value={set.targetWeightKg}
+            format={(kg) => String(kgToInput(kg, units))}
+            parse={parseDecimal}
+            resetKey={focused === 'weight' ? stepped : 0}
+            onFocus={() => focusOn('weight')}
+            onKeyDown={(e) => arrows('weight', e)}
+            onBlur={blur}
+            onCommit={(n) => onChange({ targetWeightKg: n === null ? null : toKg(n, units) })}
+          />
+        </Cell>
+      ) : null}
+
+      {fields.includes('duration') ? (
+        <Cell col="duration">
+          <NumberInput
+            label="Duration (m:ss)"
+            inputMode="numeric"
+            placeholder="m:ss"
+            className={styles.narrow}
+            value={set.targetDurationS}
+            format={formatClock}
+            parse={parseClock}
+            onFocus={() => focusOn('duration')}
+            onBlur={blur}
+            onCommit={(n) => onChange({ targetDurationS: n })}
+          />
+        </Cell>
+      ) : null}
+
+      {fields.includes('distance') ? (
+        <Cell col="distance">
+          <NumberInput
+            label={`Distance (${distanceUnit})`}
+            inputMode="decimal"
+            placeholder={distanceUnit}
+            className={styles.narrow}
+            value={set.targetDistanceM}
+            format={(m) => String(fromMeters(m, distanceUnit))}
+            parse={parseDecimal}
+            onFocus={() => focusOn('distance')}
+            onBlur={blur}
+            onCommit={(n) => onChange({ targetDistanceM: n === null ? null : toMeters(n, distanceUnit) })}
+          />
+        </Cell>
+      ) : null}
+
+      {/* A drop goes straight on from the set above, so it has no rest; nor does a superset exercise that runs
+          straight into the next one. Its column stays (empty), so the boxes line up. */}
+      {showRest && !isDrop ? (
+        <Cell col="rest">
+          <RestInput value={set.restSeconds} onFocus={() => focusOn('rest')} onBlur={blur} onCommit={(n) => onChange({ restSeconds: n ?? 0 })} />
+        </Cell>
+      ) : restColumn ? (
+        <span className={styles.setCell} data-col="rest" data-empty="" aria-hidden="true" />
+      ) : null}
+
+      {/* The fixed slot: × always on a desktop with a mouse; on touch, − / + for the focused reps or weight box. */}
+      <span className={styles.setTray} data-stepping={stepping || undefined}>
+        {stepping ? (
           <>
-            <span className={styles.setLabel} aria-hidden="true">
-              {number}
-            </span>
-            <div className={styles.field} data-col="type">
-              <span className={styles.fieldCaption} aria-hidden="true">
-                Type
-              </span>
-              {typeMenu}
-            </div>
+            <button
+              type="button"
+              className={styles.stepButton}
+              aria-label={focused === 'reps' ? 'Fewer reps' : 'Less weight'}
+              onPointerDown={keep}
+              onMouseDown={keep}
+              onClick={() => step(-1)}
+              data-ph-capture-attribute-label="workout_step_down"
+            >
+              <span aria-hidden="true">−</span>
+            </button>
+            <button
+              type="button"
+              className={styles.stepButton}
+              aria-label={focused === 'reps' ? 'More reps' : 'More weight'}
+              onPointerDown={keep}
+              onMouseDown={keep}
+              onClick={() => step(1)}
+              data-ph-capture-attribute-label="workout_step_up"
+            >
+              <span aria-hidden="true">+</span>
+            </button>
           </>
         ) : null}
-
-        {fields.includes('reps') ? (
-          <Field caption="Reps" col="reps">
-            <Stepper
-              less="Fewer reps"
-              more="More reps"
-              onStep={(dir) => {
-                const n = stepReps(singleReps(set.targetRepsMin, set.targetRepsMax), dir);
-                onChange({ targetRepsMin: n, targetRepsMax: n });
-              }}
-            >
-              <NumberInput
-                label="Reps"
-                inputMode="numeric"
-                placeholder={set.toFailure ? 'max' : 'reps'}
-                className={styles.narrow}
-                value={singleReps(set.targetRepsMin, set.targetRepsMax)}
-                format={String}
-                parse={parseWhole}
-                onCommit={(n) => onChange({ targetRepsMin: n, targetRepsMax: n })}
-              />
-            </Stepper>
-          </Field>
-        ) : null}
-
-        {fields.includes('weight') ? (
-          <Field caption={stacked ? `Weight (${units})` : 'Weight'} col="weight">
-            <Stepper
-              less="Less weight"
-              more="More weight"
-              onStep={(dir) => onChange({ targetWeightKg: stepWeight(set.targetWeightKg, dir, units) })}
-            >
-              <NumberInput
-                label={`Weight (${units})`}
-                inputMode="decimal"
-                placeholder={units}
-                className={styles.narrow}
-                value={set.targetWeightKg}
-                format={(kg) => String(kgToInput(kg, units))}
-                parse={parseDecimal}
-                onCommit={(n) => onChange({ targetWeightKg: n === null ? null : toKg(n, units) })}
-              />
-            </Stepper>
-            <span className={styles.unit} aria-hidden="true">{units}</span>
-          </Field>
-        ) : null}
-
-        {fields.includes('duration') ? (
-          <Field caption="Time" col="duration">
-            <NumberInput
-              label="Duration (m:ss)"
-              inputMode="numeric"
-              placeholder="m:ss"
-              className={styles.narrow}
-              value={set.targetDurationS}
-              format={formatClock}
-              parse={parseClock}
-              onCommit={(n) => onChange({ targetDurationS: n })}
-            />
-          </Field>
-        ) : null}
-
-        {fields.includes('distance') ? (
-          <Field caption={stacked ? `Distance (${distanceUnit})` : 'Distance'} col="distance">
-            <NumberInput
-              label={`Distance (${distanceUnit})`}
-              inputMode="decimal"
-              placeholder={distanceUnit}
-              className={styles.narrow}
-              value={set.targetDistanceM}
-              format={(m) => String(fromMeters(m, distanceUnit))}
-              parse={parseDecimal}
-              onCommit={(n) => onChange({ targetDistanceM: n === null ? null : toMeters(n, distanceUnit) })}
-            />
-            <span className={styles.unit} aria-hidden="true">{distanceUnit}</span>
-          </Field>
-        ) : null}
-
-        {/* A drop goes straight on from the set above, so it has no rest; nor does a superset exercise that runs
-            straight into the next one. */}
-        {showRest && !isDrop ? (
-          <Field caption={stacked ? 'Rest after' : 'Rest'} col="rest">
-            <RestInput value={set.restSeconds} stacked={stacked} onCommit={(n) => onChange({ restSeconds: n ?? 0 })} />
-          </Field>
-        ) : null}
-      </div>
-      {!stacked ? removeButton : null}
+        {removeButton}
+      </span>
       {errors.map((message) => (
         <ErrorText key={message} code="workout_fields_invalid" safe={false} className={styles.rowError}>
           {message}

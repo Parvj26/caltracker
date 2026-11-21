@@ -269,6 +269,7 @@ export const ERROR_CODES = {
   invite_rename_failed: "Couldn't save the name. Please try again.",
   invite_plan_save_failed: "Couldn't save the plan. Please try again.",
   invite_email_same: 'That is the email this invite already went to.',
+  invite_email_plan_kept: "Sent to the new email, but its plan couldn't be copied, so the old invite and its plan are kept and the old link still works. Set the plan on the new invite, then cancel the old one.",
   invite_old_link_failed: "Sent to the new email, but the old invite couldn't be cancelled, so its link may still work. Cancel it from the list.",
   missing_code: SERVER_ERROR_MESSAGE,
 } as const;

@@ -138,7 +138,8 @@ function Details({
         if (!outcome.ok) return setEmailError(outcome.code);
         const view = statusView(outcome.result.status, outcome.result.message);
         if (outcome.planError) setEmailError(outcome.planError);
-        else if (outcome.inviteId && !outcome.oldCancelled) setEmailError('invite_old_link_failed');
+        else if (outcome.keptOld === 'plan') setEmailError('invite_email_plan_kept');
+        else if (outcome.keptOld === 'lookup' || (outcome.inviteId && !outcome.oldCancelled)) setEmailError('invite_old_link_failed');
         if (outcome.inviteId) {
           setEmailResult(view);
           onMoved(outcome.inviteId, checked.data);

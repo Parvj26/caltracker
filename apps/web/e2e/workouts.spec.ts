@@ -32,12 +32,13 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
 
   await page.getByLabel('Workout name').fill(name);
 
-  // Each set has captions over its boxes, and the empty boxes say what goes in them. No per-set notes.
+  // The column names show once above the sets, and the empty boxes say what goes in them. No per-set notes.
   const squat = page.getByRole('region', { name: 'Barbell Squat' });
   const first = setRow(page, 'Barbell Squat', 'set 1');
-  for (const caption of ['Type', 'Reps', 'Weight', 'Rest']) {
-    await expect(first.getByText(caption, { exact: true })).toBeVisible();
+  for (const caption of ['Set', 'Type', 'Reps', 'Weight (kg)', 'Rest']) {
+    await expect(squat.getByText(caption, { exact: true }).first()).toBeVisible();
   }
+  await expect(first.getByText('Type', { exact: true })).toHaveCount(0);
   await expect(squat.getByRole('textbox', { name: 'Note', exact: true })).toHaveCount(0);
   await expect(first.getByPlaceholder('reps', { exact: true })).toBeVisible();
   await expect(first.getByLabel('Weight (kg)')).toHaveAttribute('placeholder', 'kg');
@@ -75,9 +76,9 @@ test('build a workout with warm-up, drop and superset, then reload and delete it
   const link = page.getByRole('button', { name: 'Superset Pushups with Pullups' });
   await link.click();
   await expect(link).toHaveAttribute('aria-pressed', 'true');
-  for (const ex of ['Pushups', 'Pullups']) {
-    for (let i = 0; i < 2; i++) await page.getByRole('button', { name: `Add a set to ${ex}`, exact: true }).click();
-  }
+  // A linked superset's "+ Set" adds a set to both (each copies its own last set).
+  const round = page.getByRole('region', { name: 'Pushups', exact: true }).getByRole('button', { name: 'Add a set to every exercise in the superset' });
+  for (let i = 0; i < 2; i++) await round.click();
 
   // Unsaved edits are flagged next to the Save button; after saving it says so there too.
   const saveButton = page.getByRole('button', { name: 'Save workout' });
@@ -272,9 +273,9 @@ test.describe('sections and pick-one groups', () => {
       await link.click();
       await expect(link).toHaveAttribute('aria-pressed', 'true');
     }
-    for (const n of names) {
-      for (let i = 0; i < 2; i++) await page.getByRole('button', { name: `Add a set to ${n}`, exact: true }).click();
-    }
+    // A linked superset's "+ Set" adds a set to every exercise in it.
+    const round = page.getByRole('region', { name: names[0]!, exact: true }).getByRole('button', { name: 'Add a set to every exercise in the superset' });
+    for (let i = 0; i < 2; i++) await round.click();
   }
 
   test('builds the Upper / Core workout with sections and a pick-one finisher', async ({ page }) => {
@@ -306,8 +307,8 @@ test.describe('sections and pick-one groups', () => {
     for (const [n, w] of [[1, 25], [2, 30]] as const) await fillSet(page, X('Seated DB Press'), n, 12, w);
 
     await addSuperset(page, [X('Lat Pulldown'), X('Tricep Pushdown')]);
-    await page.getByRole('button', { name: 'Add a set to Lat Pulldown' }).click();
-    await page.getByRole('button', { name: 'Add a set to Tricep Pushdown' }).click();
+    // One more round: + Set adds a set to both.
+    await page.getByRole('region', { name: X('Lat Pulldown'), exact: true }).getByRole('button', { name: 'Add a set to every exercise in the superset' }).click();
     for (const [n, w, r] of [[1, 85, 12], [2, 115, 12], [3, 85, 6], [4, 85, 6]] as const) await fillSet(page, X('Lat Pulldown'), n, r, w);
     for (const [n, w, r] of [[1, 70, 12], [2, 80, 12], [3, 90, 10], [4, 70, 6]] as const) await fillSet(page, X('Tricep Pushdown'), n, r, w);
 

@@ -3,9 +3,11 @@
 import { useId, useState } from 'react';
 import {
   MAX_CHOICE_OPTIONS,
+  MAX_SETS,
   MAX_SUBSTITUTES,
   TEMPO_PLACEHOLDER,
   blockCollapsedSummary,
+  canAddRound,
   exerciseCollapsedLine,
   parseTempo,
   setShowsRest,
@@ -17,6 +19,7 @@ import { Icon, type IconName } from './icons';
 import { MeasurementChips } from './measurements-menu';
 import { type SetPatch } from './set-row';
 import { SetTable } from './set-table';
+import { SupersetAddSet } from './superset-add-set';
 import { SubstituteEditor, type SubstituteActions } from './substitute-editor';
 import styles from './builder.module.css';
 
@@ -68,6 +71,8 @@ export type BlockActions = {
   onExerciseNote: (exId: string, note: string | null) => void;
   /** "+ Set": a copy of the exercise's last set (see addSet in packages/shared). */
   onAddSet: (exId: string) => void;
+  /** A linked superset's "+ Set": one set more for every exercise, each a copy of its own last set (addRound). */
+  onAddRound: () => void;
   onRemoveSet: (exId: string, setId: string) => void;
   onUpdateSet: (exId: string, setId: string, patch: SetPatch) => void;
   /** The measurements tab: one of Weight / Reps / Time on or off (see toggleExerciseMeasurement). */
@@ -348,7 +353,18 @@ export function BlockEditor({
             onChange={(patch) => actions.onExerciseOptions(ex.id, patch)}
           />
           <div className={styles.exerciseFooter}>
-            <AddSetButton label={`Add a set to ${ex.exerciseName}`} onClick={() => actions.onAddSet(ex.id)} />
+            {block.kind === 'superset' ? (
+              <SupersetAddSet
+                exerciseName={ex.exerciseName}
+                badge={badge}
+                full={!canAddRound(block)}
+                onlyFull={ex.sets.length >= MAX_SETS}
+                onRound={actions.onAddRound}
+                onOnlyThis={() => actions.onAddSet(ex.id)}
+              />
+            ) : (
+              <AddSetButton label={`Add a set to ${ex.exerciseName}`} onClick={() => actions.onAddSet(ex.id)} />
+            )}
             <ExerciseNote exercise={ex} id={k === 0 ? noteId : undefined} onChange={(note) => actions.onExerciseNote(ex.id, note)} />
           </div>
           <Substitutes block={block} ei={ei} units={units} errors={errors} actions={actions} restOff={restOff} />
@@ -404,7 +420,7 @@ export function ExerciseSets({ block, ei, units, errors, actions, restOff, stack
         errors={errors}
         onUpdate={(setId, patch) => actions.onUpdateSet(ex.id, setId, patch)}
         onRemove={(setId) => actions.onRemoveSet(ex.id, setId)}
-        stacked={stacked}
+        compact={stacked}
       />
     </>
   );

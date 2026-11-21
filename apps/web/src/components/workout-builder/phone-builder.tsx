@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { MAX_CHOICE_OPTIONS, MAX_SUBSTITUTES } from '@caltracker/shared';
+import { MAX_CHOICE_OPTIONS, MAX_SETS, MAX_SUBSTITUTES, canAddRound } from '@caltracker/shared';
 import type { Units, WorkoutBlockDoc } from '@caltracker/shared';
 import { cx } from '@/components/ui/cx';
 import { Button, ErrorText } from '@/components/ui';
@@ -20,8 +20,9 @@ import {
 import { BlockMenu, MoveToDialog, type MenuItem } from './block-menu';
 import { Icon } from './icons';
 import { MeasurementChips } from './measurements-menu';
+import { SupersetAddSet } from './superset-add-set';
 import { SupersetSwitch, type Link } from './superset-switch';
-import { useSheetKeyboardInset } from './use-keyboard-offset';
+import { useKeyboardOpen, useSheetKeyboardInset } from './use-keyboard-offset';
 import styles from './builder.module.css';
 import { openLayer } from '@/lib/open-layer';
 
@@ -123,6 +124,8 @@ type EditorProps = {
 export function PhoneExerciseEditor({ card, place, count, onGo, onClose, units, errors, actions, restOff, places, sectionTargets }: EditorProps) {
   const [moving, setMoving] = useState(false);
   const optionsId = useId();
+  // While typing in a box, the bottom bar steps aside so the rows keep the room above the keyboard.
+  const keyboard = useKeyboardOpen();
   const { block, member } = card;
   const choice = member === undefined && block.kind === 'choice';
   const shown = member !== undefined ? [member] : block.exercises.map((_, i) => i);
@@ -236,8 +239,18 @@ export function PhoneExerciseEditor({ card, place, count, onGo, onClose, units, 
         ) : null}
       </div>
 
-      <div className={styles.phoneEditorBar}>
-        {!choice ? (
+      <div className={styles.phoneEditorBar} hidden={keyboard || undefined}>
+        {!choice && block.kind === 'superset' ? (
+          <SupersetAddSet
+            exerciseName={first.exerciseName}
+            badge={card.badge}
+            full={!canAddRound(block)}
+            onlyFull={first.sets.length >= MAX_SETS}
+            onRound={actions.onAddRound}
+            onOnlyThis={() => actions.onAddSet(first.id)}
+            phone
+          />
+        ) : !choice ? (
           <button type="button" className={styles.phoneAddSet} aria-label={`Add a set to ${first.exerciseName}`} onClick={() => actions.onAddSet(first.id)} data-ph-capture-attribute-label="workout_add_set">
             + Set <span className={styles.addSetHint}>copies last set</span>
           </button>
