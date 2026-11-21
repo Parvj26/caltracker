@@ -23,7 +23,7 @@ export type CorrectiveChoice = {
   exerciseId: string;
   name: string;
   trackingType: TrackingType;
-  imagePath: string | null;
+  imageUrl: string | null;
   direction: CorrectiveDirection;
   muscles: readonly MuscleTag[];
   dose: CorrectiveDose;

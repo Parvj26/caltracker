@@ -65,11 +65,12 @@ export async function loadPicks(supabase: Supabase, workspaceId: string, assessm
 
 type ExerciseRow = { id: string; name: string; tracking_type: string; image_paths: string[] };
 
-const choiceFrom = (e: ExerciseRow) => ({
+/** The exercise's first picture as a public URL (exercise-images is a public bucket), or null. */
+const choiceFrom = (supabase: Supabase, e: ExerciseRow) => ({
   exerciseId: e.id,
   name: e.name,
   trackingType: toTrackingType(e.tracking_type),
-  imagePath: e.image_paths[0] ?? null,
+  imageUrl: e.image_paths[0] ? supabase.storage.from('exercise-images').getPublicUrl(e.image_paths[0]).data.publicUrl : null,
 });
 
 /**
@@ -95,7 +96,7 @@ export async function loadCorrectiveChoices(supabase: Supabase, workspaceId: str
     const muscles: MuscleTag[] = c.corrective_exercise_muscles.flatMap((m) => (isMuscleId(m.muscle_id) ? [{ muscleId: m.muscle_id, side: m.side as MarkSide }] : []));
     return [
       {
-        ...choiceFrom(e),
+        ...choiceFrom(supabase, e),
         direction: c.direction as CorrectiveDirection,
         muscles,
         dose: { sets: c.default_sets, reps: c.default_reps, seconds: c.default_seconds, eachSide: c.each_side },
@@ -113,7 +114,7 @@ export async function loadCorrectiveChoices(supabase: Supabase, workspaceId: str
     if (!e) return [];
     return [
       {
-        ...choiceFrom(e),
+        ...choiceFrom(supabase, e),
         direction: b.direction,
         muscles: b.muscles.flatMap((m) => regionSides(m).map((side) => ({ muscleId: m, side }))),
         dose: b.dose,

@@ -5,6 +5,7 @@ import { requireCoach } from '@/lib/auth';
 import { getClient } from '@/lib/page-data';
 import { pageTitle } from '@/lib/page-titles';
 import { createServerSupabase } from '@/lib/supabase/server';
+import { checkpointLabels, findingsFrom, loadMarks } from '@/lib/assessment-findings';
 import { loadAssessment } from '../load';
 import { RunView } from '../run-view';
 import { SummaryView } from '../summary-view';
@@ -42,7 +43,12 @@ export default async function AssessmentPage({
   if (!loaded) notFound();
   const { client, assessment } = loaded;
   const who = { id: client.id, name: client.name };
-  if (assessment.status === 'done') return <SummaryView client={who} assessment={assessment} />;
+  if (assessment.status === 'done') {
+    const { workspaceId } = await requireCoach();
+    const { marks, checks } = await loadMarks(await createServerSupabase(), workspaceId, assessment.id);
+    const findings = findingsFrom(marks, checks, checkpointLabels(assessment.tests.map((t) => t.definition)));
+    return <SummaryView client={who} assessment={assessment} findings={findings} current={client.removedAt === null} />;
+  }
   if (client.removedAt !== null) redirect(`/clients/${client.id}/limitations`);
   // ?test=N reopens a given test (kept in the address as the coach moves on, so a reload stays put).
   const test = typeof query.test === 'string' && /^\d{1,2}$/.test(query.test) ? Number(query.test) : null;

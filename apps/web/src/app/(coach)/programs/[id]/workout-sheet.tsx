@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
-import { emptyWorkout, type ExercisePrefs, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { IsoDateSchema, emptyWorkout, scheduleDateError, type ExercisePrefs, type IsoDate, type Units, type WorkoutDoc } from '@caltracker/shared';
+import { QuickDayPicker } from '@/components/assign/quick-day-picker';
 import { formatShortDay } from '@/components/calendar/format';
 import { WorkoutBuilder } from '@/components/workout-builder/workout-builder';
 import { Button } from '@/components/ui';
@@ -23,7 +24,12 @@ import { FlagReminderLoader } from '@/components/flags/flag-reminder';
 export type SheetTarget =
   | { kind: 'new'; week: number; day: number }
   | { kind: 'edit'; slot: Slot; workout: SlotWorkout }
-  | { kind: 'client'; clientId: string; clientName: string; date: IsoDate; today: IsoDate };
+  | { kind: 'client'; clientId: string; clientName: string; date: IsoDate; today: IsoDate }
+  /**
+   * The suggested corrective workout from an assessment (board AS5b): opens filled in, and "Assign to client" asks for
+   * the day (the same quick days as "+ Add workout") before it goes on that client's calendar.
+   */
+  | { kind: 'suggested'; clientId: string; clientName: string; today: IsoDate; doc: WorkoutDoc };
 
 /** What a save did, so the grid can show it without reloading. */
 export type SheetSaved =
@@ -81,9 +87,10 @@ export function WorkoutSheet({
   const [dirty, setDirty] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [asking, setAsking] = useState<((c: Choice) => void) | null>(null);
+  const [askingDay, setAskingDay] = useState<((d: IsoDate | null) => void) | null>(null);
   const saved = useRef<SheetSaved | null>(null);
   const [initial] = useState<WorkoutDoc>(() =>
-    target.kind === 'edit' ? target.workout.doc : emptyWorkout(() => crypto.randomUUID()),
+    target.kind === 'edit' ? target.workout.doc : target.kind === 'suggested' ? target.doc : emptyWorkout(() => crypto.randomUUID()),
   );
   // A client's new workout: "Also save to Library" (off to start with), and the calendar copy's id when it is ticked
   // (made once, so a retry adds it only once).
@@ -92,7 +99,8 @@ export function WorkoutSheet({
   const [libraryId] = useState(() => crypto.randomUUID());
   const week = target.kind === 'new' ? target.week : target.kind === 'edit' ? target.slot.week : 0;
   const day = target.kind === 'new' ? target.day : target.kind === 'edit' ? target.slot.day : 0;
-  const where = target.kind === 'client' ? formatShortDay(target.date) : cellLabel(week, day);
+  const where = target.kind === 'client' ? formatShortDay(target.date) : target.kind === 'suggested' ? 'Suggested' : cellLabel(week, day);
+  const forClient = target.kind === 'client' || target.kind === 'suggested';
   const original = target.kind === 'edit' ? target.workout.doc.name : '';
   const isNew = target.kind !== 'edit';
 
@@ -126,6 +134,14 @@ export function WorkoutSheet({
     await Promise.resolve();
     return new Promise<Choice>((resolve) => setAsking(() => resolve));
   };
+  const askDay = async () => {
+    await Promise.resolve();
+    return new Promise<IsoDate | null>((resolve) => setAskingDay(() => resolve));
+  };
+  function answerDay(d: IsoDate | null) {
+    askingDay?.(d);
+    setAskingDay(null);
+  }
   function answer(c: Choice) {
     asking?.(c);
     setAsking(null);
@@ -142,6 +158,13 @@ export function WorkoutSheet({
   }
 
   async function saveWith(doc: WorkoutDoc): Promise<SaveWorkoutOutcome | null> {
+    if (target.kind === 'suggested') {
+      const date = await askDay();
+      if (date === null) return null;
+      const outcome = await createClientWorkout({ doc, clientId: target.clientId, date, today: target.today, alsoLibrary, newId: calendarId, libraryId });
+      if (outcome.ok) saved.current = { kind: 'client', id: outcome.id, name: doc.name, date, library: alsoLibrary };
+      return outcome;
+    }
     if (target.kind === 'client') {
       const outcome = await createClientWorkout({
         doc,
@@ -183,13 +206,13 @@ export function WorkoutSheet({
       <header className={styles.sheetHeader}>
         <div className={styles.sheetHeading}>
           <span className={styles.eyebrow}>
-            {target.kind === 'client' ? target.clientName : programName} · {where}
+            {forClient ? target.clientName : programName} · {where}
           </span>
           <h2 id={titleId} className={styles.dialogTitle}>
-            {isNew ? 'New workout' : `Edit ${original}`}
+            {target.kind === 'suggested' ? 'Suggested workout' : isNew ? 'New workout' : `Edit ${original}`}
           </h2>
         </div>
-        {target.kind === 'client' ? (
+        {forClient ? (
           // Off to start with: a workout made for one client stays theirs unless the coach wants it in the Library too.
           <label className={styles.sheetLibraryToggle}>
             <input type="checkbox" checked={alsoLibrary} onChange={(e) => setAlsoLibrary(e.target.checked)} data-ph-capture-attribute-label="client_new_workout_library" />
@@ -199,11 +222,11 @@ export function WorkoutSheet({
         {/* Phones only (CSS) on a program: wider screens keep the editor's own save bar in view. A client's new workout
             keeps Save here on every size, beside "Also save to Library". */}
         <Button
-          className={cx(styles.sheetTopSave, target.kind === 'client' && styles.sheetTopSaveAlways)}
+          className={cx(styles.sheetTopSave, forClient && styles.sheetTopSaveAlways)}
           onClick={saveFromTop}
-          data-ph-capture-attribute-label={target.kind === 'client' ? 'client_new_workout_save' : 'program_sheet_top_save'}
+          data-ph-capture-attribute-label={target.kind === 'suggested' ? 'suggested_workout_assign' : target.kind === 'client' ? 'client_new_workout_save' : 'program_sheet_top_save'}
         >
-          Save
+          {target.kind === 'suggested' ? 'Assign to client' : 'Save'}
         </Button>
         {/* The one close style (rulebook §5.2): a 44 px grey circle with ×, top right. */}
         <button type="button" className={ad.close} aria-label="Close" onClick={close}>
@@ -227,7 +250,10 @@ export function WorkoutSheet({
         </div>
       ) : null}
       {/* A workout for one client: their open flags under the title (board AS10). */}
-      {target.kind === 'client' ? <FlagReminderLoader clientId={target.clientId} /> : null}
+      {forClient ? <FlagReminderLoader clientId={target.clientId} /> : null}
+      {target.kind === 'suggested' ? (
+        <p className={styles.sheetNote}>{countExercises(target.doc)} · sets and reps filled in from each exercise’s default. Nothing reaches {target.clientName} until you assign it.</p>
+      ) : null}
       {target.kind === 'new' ? (
         <p className={styles.sheetNote}>Saving puts it on {where} and in your Workouts list, then brings you back to the program.</p>
       ) : null}
@@ -239,8 +265,8 @@ export function WorkoutSheet({
           mode="library"
           isNew={isNew}
           initialPrefs={exercisePrefs}
-          saveLabel={target.kind === 'new' ? 'Save and add to day' : 'Save'}
-          {...(target.kind === 'client' ? { hideWideSave: true } : {})}
+          saveLabel={target.kind === 'new' ? 'Save and add to day' : target.kind === 'suggested' ? 'Assign to client' : 'Save'}
+          {...(forClient ? { hideWideSave: true } : {})}
           saveWith={saveWith}
           onDirtyChange={setDirty}
           embedded
@@ -249,6 +275,10 @@ export function WorkoutSheet({
           }}
         />
       </div>
+
+      {askingDay && target.kind === 'suggested' ? (
+        <DayDialog clientName={target.clientName} today={target.today} onAnswer={answerDay} />
+      ) : null}
 
       {asking ? (
         <SmallDialog title={`Save changes to “${original}”?`} onCancel={() => answer(null)}>
@@ -274,6 +304,37 @@ export function WorkoutSheet({
       ) : null}
 
     </dialog>
+  );
+}
+
+const countExercises = (doc: WorkoutDoc) => {
+  const n = doc.blocks.reduce((sum, b) => sum + b.exercises.length, 0);
+  return `${n} ${n === 1 ? 'exercise' : 'exercises'}`;
+};
+
+/** "Assign to <client>": the day (quick days or Pick a date…), then Assign · <day>. A question over the sheet. */
+function DayDialog({ clientName, today, onAnswer }: { clientName: string; today: IsoDate; onAnswer: (d: IsoDate | null) => void }) {
+  const [date, setDate] = useState<string>(today);
+  const parsed = IsoDateSchema.safeParse(date);
+  const error = !parsed.success ? 'Pick a date.' : scheduleDateError(parsed.data, today);
+  return (
+    <SmallDialog title={`Assign to ${clientName}`} onCancel={() => onAnswer(null)}>
+      <QuickDayPicker legend="Day" today={today} value={date} onChange={setDate} fieldMin={today} error={error} />
+      <div className={styles.dialogActions}>
+        <Button variant="secondary" onClick={() => onAnswer(null)}>
+          Cancel
+        </Button>
+        <Button
+          aria-disabled={error !== null}
+          data-testid="assign-day-confirm"
+          onClick={() => {
+            if (error === null && parsed.success) onAnswer(parsed.data);
+          }}
+        >
+          Assign · {parsed.success ? formatShortDay(parsed.data) : '…'}
+        </Button>
+      </div>
+    </SmallDialog>
   );
 }
 

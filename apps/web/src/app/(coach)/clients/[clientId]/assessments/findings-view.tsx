@@ -345,14 +345,9 @@ export function FindingsView({
       </div>
 
       <div className={styles.layout} data-tab={tab}>
-        <div className={styles.colObserved}>
-          {observed}
-          <div className={styles.alsoWide}>{also}</div>
-        </div>
-        <div className={styles.colSuspected}>
-          {suspected}
-          <div className={styles.alsoNarrow}>{also}</div>
-        </div>
+        <div className={styles.colObserved}>{observed}</div>
+        <div className={styles.colSuspected}>{suspected}</div>
+        {also ? <div className={styles.colAlso}>{also}</div> : null}
         <div className={styles.colMap}>{map}</div>
       </div>
 
@@ -409,7 +404,7 @@ function GroupRow({
           <MarkChip status={g.status} />
         </div>
         {editable ? (
-          <Button variant="quiet" size="compact" onClick={onChangeOpen} aria-expanded={changing} aria-label={`Change ${name}`} phSafe>
+          <Button variant="quiet" size="compact" onClick={onChangeOpen} aria-expanded={changing} aria-label={`Change ${name}`}>
             Change
           </Button>
         ) : null}

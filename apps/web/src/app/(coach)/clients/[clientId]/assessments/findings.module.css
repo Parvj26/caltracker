@@ -5,30 +5,30 @@
 /* Phone: List | Body map. Wider: everything at once. */
 .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ct-space-1); padding: var(--ct-space-1); border-radius: var(--ct-radius-input); background: var(--ct-surface); }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ct-space-6); align-items: start; }
-.colObserved, .colSuspected, .colMap { display: flex; flex-direction: column; gap: var(--ct-space-6); min-width: 0; }
+.colObserved, .colSuspected, .colAlso, .colMap { display: flex; flex-direction: column; gap: var(--ct-space-6); min-width: 0; }
 .layout[data-tab='list'] .colMap { display: none; }
-.layout[data-tab='map'] .colObserved, .layout[data-tab='map'] .colSuspected { display: none; }
-.alsoWide { display: none; }
+.layout[data-tab='map'] .colObserved, .layout[data-tab='map'] .colSuspected, .layout[data-tab='map'] .colAlso { display: none; }
 
 @container findings (min-width: 700px) {
   .tabs { display: none; }
   .layout, .layout[data-tab] {
     grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
-    grid-template-areas: 'obs map' 'sus map';
+    grid-template-areas: 'obs map' 'sus map' 'also map';
+    grid-template-rows: auto auto 1fr;
     column-gap: var(--ct-space-8);
   }
-  .layout .colObserved, .layout .colSuspected, .layout .colMap { display: flex; }
+  .layout[data-tab] :is(.colObserved, .colSuspected, .colAlso, .colMap) { display: flex; }
   .colObserved { grid-area: obs; }
   .colSuspected { grid-area: sus; }
-  .colMap { grid-area: map; position: sticky; top: var(--ct-space-4); }
+  .colAlso { grid-area: also; }
+  .colMap { grid-area: map; align-self: start; position: sticky; top: var(--ct-space-4); }
 }
 @container findings (min-width: 1100px) {
   .layout, .layout[data-tab] {
     grid-template-columns: minmax(220px, 300px) minmax(0, 1fr) minmax(320px, 400px);
-    grid-template-areas: 'obs sus map';
+    grid-template-areas: 'obs sus map' 'also sus map';
+    grid-template-rows: auto 1fr;
   }
-  .alsoWide { display: block; }
-  .alsoNarrow { display: none; }
 }
 
 .block { display: flex; flex-direction: column; gap: var(--ct-space-2); min-width: 0; }

@@ -60,7 +60,7 @@ export function FindingsMap({
         ))}
         {children}
       </div>
-      <BodyMapLegend className={styles.legend} />
+      <BodyMapLegend className={styles.legend ?? ''} />
     </div>
   );
 }

@@ -35,7 +35,7 @@
   white-space: nowrap;
 }
 .markChip[data-status='over'] { background: color-mix(in srgb, var(--ct-map-over) 14%, var(--ct-bg)); color: var(--ct-danger-deep); }
-.markChip[data-status='under'] { background: var(--ct-map-under-bg); color: var(--ct-magenta); }
+.markChip[data-status='under'] { background: var(--ct-map-under-bg); color: color-mix(in srgb, var(--ct-magenta) 60%, var(--ct-ink)); }
 .markChip[data-status='normal'] { background: var(--ct-map-normal); color: var(--ct-map-normal-line); }
 .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .markChip[data-status='over'] .swatch { background: var(--ct-map-over); }

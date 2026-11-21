@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   SLOT_LABELS,
   formatPlainDayMonthInYear,
@@ -8,7 +9,10 @@ import {
   type FootArch,
   type MeasureDef,
 } from '@caltracker/shared';
-import { Card, PageHeader } from '@/components/ui';
+import { ConfirmedFindingsList } from '@/components/assessment-findings/findings-list';
+import { FindingsMap } from '@/components/assessment-findings/findings-map';
+import { ButtonLink, Card, PageHeader } from '@/components/ui';
+import type { AssessmentFindings } from '@/lib/assessment-findings';
 import { useLocalToday } from '@/lib/local-today';
 import type { AssessmentDetail } from './load';
 import { FindingsList, ScoreCard } from './parts';
@@ -19,9 +23,20 @@ const ARCH: Record<FootArch, string> = { flat: 'Flat', normal: 'Normal', high: '
 
 /**
  * A finished assessment (step 1 of AS6): the Movement score with a bar per test, what was observed, the numbers, and
- * the notes. The body map, priorities and suggested workout come in later steps.
+ * the notes, and (step 2) the coach-confirmed findings on the body map with a way back to the exercises and the
+ * suggested workout. The report layout comes in step 3.
  */
-export function SummaryView({ client, assessment }: { client: { id: string; name: string }; assessment: AssessmentDetail }) {
+export function SummaryView({
+  client,
+  assessment,
+  findings: confirmed,
+  current,
+}: {
+  client: { id: string; name: string };
+  assessment: AssessmentDetail;
+  findings: AssessmentFindings;
+  current: boolean;
+}) {
   const today = useLocalToday();
   const inputs = assessment.tests.map((t) => ({ definition: t.definition, status: t.entry.status, results: t.entry.results }));
   // The stored score is the one saved at the time; the bars use the same rule on the same ratings.
@@ -81,6 +96,19 @@ export function SummaryView({ client, assessment }: { client: { id: string; name
           ) : null}
         </div>
         <div className={styles.summaryCol}>
+          <Card className={styles.card} aria-labelledby="map-heading" data-testid="summary-findings">
+            <div className={styles.cardHead}>
+              <h2 id="map-heading" className={styles.heading}>Findings</h2>
+              <Link href={`/clients/${client.id}/assessments/${assessment.id}/findings`} className={styles.moreLink}>Review</Link>
+            </div>
+            <FindingsMap states={confirmed.states} size="small" label="Confirmed findings" />
+            <ConfirmedFindingsList rows={confirmed.rows} checks={confirmed.checks} />
+            {current ? (
+              <ButtonLink href={`/clients/${client.id}/assessments/${assessment.id}/exercises`} variant="secondary" phSafe>
+                Exercises and suggested workout
+              </ButtonLink>
+            ) : null}
+          </Card>
           <Card className={styles.card} aria-labelledby="observed-heading">
             <h2 id="observed-heading" className={styles.heading}>Observed</h2>
             <FindingsList findings={findings} />

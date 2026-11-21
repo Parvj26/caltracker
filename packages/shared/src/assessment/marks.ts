@@ -160,7 +160,7 @@ export function reviewGroups(rows: readonly ReviewRow[]): ReviewGroup[] {
   const rank: Record<MarkStatus, number> = { over: 0, under: 1, normal: 2 };
   return [...groups.values()]
     .sort((a, b) => rank[a.status] - rank[b.status] || a.order - b.order)
-    .map(({ order: _order, ...g }) => ({ ...g, rows: [...g.rows].sort((a, b) => SIDE_ORDER[a.side] - SIDE_ORDER[b.side]) }));
+    .map((g) => ({ muscleId: g.muscleId, status: g.status, sources: g.sources, against: g.against, rows: [...g.rows].sort((a, b) => SIDE_ORDER[a.side] - SIDE_ORDER[b.side]) }));
 }
 
 /** The marks the coach confirmed, in catalogue order (the report and the map read these). */
